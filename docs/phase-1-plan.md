@@ -59,9 +59,10 @@ Single repository, structure per `architecture.md §15`. Maintainability reasons
 ### Build order and dependencies
 
 ```
-A → (B ∥ D) → C → E
+Prereqs → A → (B ∥ D) → C → E
 ```
 
+- **Prerequisites** (§3) is one-time environment work — Proxmox host install and Terraform VM provisioning — that must complete before any slice starts. It is not a slice and does not participate in the dependency graph beyond "A starts from Prereqs' exit state."
 - **A** is the critical-path substrate; nothing else builds without it.
 - **B** and **D** are parallel-safe once A is done — they touch different subsystems.
 - **C** depends on B because the hibernate/respawn round-trip needs a review-event webhook to fire, which requires Cerberus.
@@ -69,48 +70,155 @@ A → (B ∥ D) → C → E
 
 ---
 
-## 3. Slice A — "a pod can do a task"
+## 3. Prerequisites — Crete host and VMs
+
+Before any Slice A work begins, Crete must be installed and the four Daedalus guests must exist and be reachable. This is environment work, not Daedalus code: a one-time manual host install followed by automated Terraform provisioning modeled on the sibling `homelab/` repo. Slice A begins from the exit criteria at the end of this section.
+
+### 3.1 Manual Proxmox host install (Crete)
+
+Hypervisor setup is one-time and intentionally out of scope for automation — the `homelab/` repo assumes Proxmox already exists, and Daedalus assumes the same. These steps land on Crete before any Terraform runs.
+
+**Hardware prep:**
+- Minisforum MS-01 racked per `environment.md §1`
+- Two 1TB NVMe drives in the first two M.2 slots (third M.2 reserved)
+- Network uplinked to the homelab switch on the trunked VLAN port per `environment.md §2`
+
+**Proxmox VE install:**
+- Proxmox VE 9.x installed from USB; ZFS RAID-1 mirror across the two NVMe drives as the root and VM-storage pool; hostname `crete`
+- Management IP on the homelab management VLAN; confirm headless reachability after reboot
+- `apt update && apt dist-upgrade`; switch to the no-subscription repo; disable the subscription-nag dialog if desired
+- ZFS scrub schedule reviewed before production data lands on the pool
+
+**Networking:**
+- Proxmox bridge `vmbr0` bound to the uplink NIC with VLAN-aware mode enabled
+- All VLAN tags used by Daedalus guests (management, services) configured on `vmbr0` — the guests attach via tagged subinterfaces in Terraform
+- Specific VLAN IDs are a Phase 1 open question per `architecture.md §18`; confirm them before Terraform runs
+- Edge firewall (pfSense or equivalent) has a rule allowing admin access to Crete from the operator workstation VLAN
+
+**Terraform access:**
+- Dedicated Proxmox API user (`terraform@pve`) with role permissions for VM/LXC lifecycle, SDN, and storage operations per `homelab/terraform/` conventions
+- API token generated for that user and stored in the operator's workstation secret store (never committed)
+- Operator workstation SSH public key added to root's `~/.ssh/authorized_keys` on Crete (the `bpg/proxmox` provider drives some actions over SSH)
+- Test: `pveum user list` returns the Terraform user; `ssh root@crete pveversion` works from the workstation
+
+**Baseline storage:**
+- ZFS dataset for VM disks confirmed (`rpool/data` is fine as default)
+- ISO/cloud-image storage pool confirmed (`local` is fine as default)
+- Third M.2 slot remains unallocated per `environment.md §1`
+
+**Explicitly out of scope for Daedalus:**
+- Off-host backup (`environment.md §1`: Proxmox snapshots are the recovery floor; external backup is not in Daedalus scope)
+- VLAN/SDN creation on Crete when it does not already exist — either provisioned by the `homelab/` repo's `modules/network/` or created manually; Daedalus Terraform references VLANs rather than declaring them
+
+### 3.2 Terraform VM provisioning
+
+Daedalus ships a `terraform/` directory at the repo root patterned on `homelab/terraform/`, scoped to the four Daedalus guests and nothing else. The full homelab stack (UniFi provider, Vultr, Cloudflare, SDN management, Ansible inventory seeding for the whole lab) is explicitly not copied in — Daedalus provisions what Daedalus owns.
+
+**Repo layout:**
+```
+terraform/
+  main.tf                     — module instantiations
+  provider.tf                 — bpg/proxmox provider config
+  variables.tf                — inputs (Proxmox endpoint, credentials, VLAN refs)
+  outputs.tf                  — VM IPs, SSH user, inventory yaml
+  vm-configs.tf               — Daedalus guest definitions
+  vars.auto.tfvars.example    — sanitized template; real tfvars gitignored
+  modules/
+    proxmox-vm/               — VM module, adapted from homelab
+    proxmox-lxc/              — LXC module (homelab has VMs only)
+```
+
+**Provider and credentials:**
+- `bpg/proxmox` ~> 0.78 to match homelab
+- Endpoint points at Crete's management IP; `ssh.agent = true` for actions requiring SSH
+- Credentials loaded from `TF_VAR_*` environment variables at apply time — never in the repo. Wrapper script in `scripts/` is acceptable for ergonomics as long as it sources from the workstation secret store, not checked-in files
+- Pre-commit hook blocking secrets in `vars.auto.tfvars`, same as homelab
+
+**Guest definitions (from `architecture.md §4 VM Inventory`):**
+
+| Guest | Type | vCPU | RAM | Disk | VLANs | Base image |
+|---|---|---|---|---|---|---|
+| `minos` | VM | 2 | 8GB | 50GB | mgmt, services | Ubuntu 24.04 cloud image |
+| `postgres` | LXC | 2 | 4GB | 50GB | mgmt, services | Debian 12 template |
+| `labyrinth` | VM | 4 | 16GB | 200GB | mgmt, services | Ubuntu 24.04 cloud image; nested virt enabled |
+| `ariadne` | VM | 2 | 4GB | 100GB | mgmt, services | Ubuntu 24.04 cloud image |
+
+VLAN references live as variables so specific VLAN IDs can land without editing `vm-configs.tf`.
+
+**LXC handling:**
+- Homelab's `modules/proxmox-vm/` is VM-only; Daedalus adds a sibling `modules/proxmox-lxc/` using `proxmox_virtual_environment_container` for the Postgres guest
+- LXC cloud-init equivalent (hook scripts or `user_data`) provisions initial user, SSH key, baseline packages — same downstream contract as VM cloud-init
+
+**Cloud-init baseline (all guests):**
+- Non-root admin user with operator's SSH public key injected
+- Timezone, NTP, locale set from Terraform variables
+- `apt update && apt upgrade` on first boot; unattended-upgrades enabled
+- UFW or nftables default-deny inbound except SSH (plus the guest's Daedalus-specific ports once Slice A lands the services)
+
+**Inventory output:**
+- `terraform output -raw ansible_inventory_yaml > inventory.yaml` produces an Ansible-shaped inventory mirroring `homelab/` even if Phase 1 does not adopt Ansible for post-provision (4-VM scale is within shell-script reach)
+
+**Apply flow:**
+- `terraform init` — first run on operator workstation
+- `terraform plan` — review
+- `terraform apply` — provision all four guests
+- `terraform output` — confirm reachability and note IPs for Slice A's software-install tasks
+
+### 3.3 Exit criteria for Prerequisites
+
+- Four guests reachable over SSH as the operator admin user (`ssh minos hostname`, etc., return expected names)
+- Proxmox UI shows all four with correct VLAN attachments and resource sizing per the table above
+- `terraform plan` on a second run shows no drift
+- Operator workstation has the Proxmox API token, SSH keys, and `TF_VAR_*` wrapper ready to re-run Terraform on demand
+
+Slice A starts from this point.
+
+---
+
+## 4. Slice A — "a pod can do a task"
 
 **Proves:** commission → pod work → PR. (Acceptance gate bullet 1, first half.)
 
-**Scope:** the minimum substrate that lets Minos commission a pod via CLI or HTTP and produce a pull request. No Discord, no hibernation, no Mnemosyne, no Argus enforcement.
+**Scope:** starting from the Prerequisites exit state, install Daedalus-specific software on the four guests and land the minimum code path that lets Minos commission a pod via CLI or HTTP and produce a pull request. No Discord, no hibernation, no Mnemosyne, no Argus enforcement.
 
 ### Tasks
 
-1. **Infrastructure floor** (environment work, not Daedalus code)
-   - Proxmox VMs: Minos VM, Postgres LXC, Labyrinth VM, Ariadne VM per `architecture.md §4 VM Inventory`
-   - ZFS mirror and firewall rules per `architecture.md §4 Network`
-   - Ariadne Vector + Loki stood up for log ingest (no query-side work yet; ingest is needed because pods ship logs)
+1. **Postgres install + schemas** (Postgres LXC)
+   - Install Postgres on the LXC provisioned in §3.2
+   - Create schemas `minos`, `argus`, `mnemosyne`, `iris` per `architecture.md §6 Recovery and Reconciliation`
+   - Install the pgvector extension (used in Slice C; install now so migrations are ordered correctly)
+   - Migration tooling chosen (golang-migrate, goose, or atlas — decide at implementation); first migration lands the Slice A `tasks` table in the `minos` schema
 
-2. **Postgres LXC + schemas**
-   - Single Postgres instance with `minos`, `argus`, `mnemosyne`, `iris` schemas per `architecture.md §6 Recovery and Reconciliation`
-   - pgvector extension installed (used in Slice C; install now so migrations are ordered correctly)
-   - Migration tooling chosen (golang-migrate, goose, or atlas — decide at implementation)
+2. **Ariadne log stack install** (Ariadne VM)
+   - Install Vector as the ingest shipper and Loki as the log store per `architecture.md §12`
+   - Configure Vector on each Daedalus guest to forward stdout/journald to Ariadne's Loki
+   - Query-side work (Grafana, ariadne MCP) is deferred; Phase 1 debugging uses direct LogQL
 
-3. **Shared Go modules in monorepo**
+3. **k3s install** (Labyrinth VM)
+   - Single-node k3s with default flannel CNI
+   - Host nftables rules per `architecture.md §11 Network Isolation`
+   - Proxmox-vNIC firewall allowlist per `architecture.md §11 Egress Granularity`
+   - `kubectl` access configured on Minos VM (the only expected caller in Phase 1)
+
+4. **Shared Go modules in monorepo**
    - `pkg/envelope` — task envelope schema types + JSON Schema validation
    - `pkg/jwt` — Ed25519 signing/verification (Phase 2 consumer; Phase 1 uses HMAC bearer, but design the package so Phase 2 substitution is drop-in)
    - `pkg/provider` — secret-provider interface (`Resolve`, `Rotate`, `Revoke`, `AuditList`)
    - `pkg/audit` — structured audit emitter; writes to stdout in JSON for Vector to pick up
 
-4. **Secret provider: file-backed reference**
+5. **Secret provider: file-backed reference**
    - Implements the `pkg/provider` interface reading from a YAML/JSON file under the Minos config directory
    - Phase 1 shipping default per `architecture.md §17` MVP Blockers — Secret provider
    - Infisical provider is a Slice A stretch goal; not a blocker for the acceptance checkpoint
 
-5. **Minos core — minimum viable**
-   - Service binary under `minos/core/`
+6. **Minos core — minimum viable**
+   - Service binary under `minos/core/`, deployed as a systemd unit on the Minos VM
    - Single hardcoded project config loader
    - Single hardcoded admin identity loader
    - Task registry: CRUD on `tasks` table
    - Dispatch: accept an HTTP `POST /tasks` from CLI, compose task envelope, spawn a k3s pod, insert task row in `running` state
-   - State machine: `queued → running → completed | failed`  (no `awaiting-review` yet — that lands in Slice C)
+   - State machine: `queued → running → completed | failed` (no `awaiting-review` yet — that lands in Slice C)
    - Startup reconciliation per `architecture.md §6 Recovery and Reconciliation` (minimum: DB integrity + adopt/orphan pods)
-
-6. **Labyrinth k3s**
-   - Single-node k3s on Labyrinth VM, default flannel CNI
-   - Host nftables rules per `architecture.md §11 Network Isolation`
-   - Proxmox-vNIC firewall allowlist per `architecture.md §11 Egress Granularity`
 
 7. **GitHub App deployment**
    - GitHub App created in the operator's GitHub account with permissions: repo contents rw, PRs rw, issues rw, metadata r
@@ -136,7 +244,7 @@ A → (B ∥ D) → C → E
 
 ---
 
-## 4. Slice B — "operator loop closes"
+## 5. Slice B — "operator loop closes"
 
 **Proves:** operator commissions from Discord; PR-merge webhook drives task to terminal; summary posts to thread. (Acceptance gate bullet 1, hibernation deferred to Slice C.)
 
@@ -191,7 +299,7 @@ A → (B ∥ D) → C → E
 
 ---
 
-## 5. Slice D — "guardrails on" (parallel with B)
+## 6. Slice D — "guardrails on" (parallel with B)
 
 **Proves:** Argus wall-clock cap and stall detection terminate misbehaving pods; task threads get warning/escalation/termination posts.
 
@@ -230,7 +338,7 @@ Landing D in parallel with B ensures every later slice runs under real guardrail
 
 ---
 
-## 6. Slice C — "memory persists across runs"
+## 7. Slice C — "memory persists across runs"
 
 **Proves:** run records persist; `awaiting-review` hibernation + respawn with Mnemosyne context drives the task to terminal. (Acceptance gate bullets 1 full, 3.)
 
@@ -280,7 +388,7 @@ Landing D in parallel with B ensures every later slice runs under real guardrail
 
 ---
 
-## 7. Slice E — "Iris talks"
+## 8. Slice E — "Iris talks"
 
 **Proves:** Iris answers "what's running?" and "start a task for X" on the same surface. (Acceptance gate bullet 2.)
 
@@ -323,7 +431,7 @@ Landing D in parallel with B ensures every later slice runs under real guardrail
 
 ---
 
-## 8. Cross-Cutting Concerns
+## 9. Cross-Cutting Concerns
 
 ### Testing strategy per slice
 
@@ -355,7 +463,7 @@ Landing D in parallel with B ensures every later slice runs under real guardrail
 
 ---
 
-## 9. Risks and Open Questions
+## 10. Risks and Open Questions
 
 ### Risks
 
