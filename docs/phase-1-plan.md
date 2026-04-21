@@ -59,11 +59,12 @@ Single repository, structure per `architecture.md §15`. Maintainability reasons
 ### Build order and dependencies
 
 ```
-Prereqs → A → (B ∥ D) → C → E
+       A → (B ∥ D) → C → E         (code slices)
+Prereqs ·········································→ (parallel track; must complete before any slice's acceptance checkpoint)
 ```
 
-- **Prerequisites** (§3) is one-time environment work — Proxmox host install and Terraform VM provisioning — that must complete before any slice starts. It is not a slice and does not participate in the dependency graph beyond "A starts from Prereqs' exit state."
-- **A** is the critical-path substrate; nothing else builds without it.
+- **Prerequisites** (§3) runs in parallel with code work, not as a gate on it. Code is developed on the operator workstation against local substrates (Postgres in Docker, `k3d` or `kind` for Kubernetes, file-backed secret provider). VMs are only required for a slice's acceptance checkpoint — the end-to-end smoke test on the real Crete deployment. Prereqs must be complete by then, but not before coding starts.
+- **A** is the critical-path substrate for the code graph; nothing else builds without it.
 - **B** and **D** are parallel-safe once A is done — they touch different subsystems.
 - **C** depends on B because the hibernate/respawn round-trip needs a review-event webhook to fire, which requires Cerberus.
 - **E** depends on C because Iris's `memory.lookup` requires Mnemosyne.
@@ -72,7 +73,7 @@ Prereqs → A → (B ∥ D) → C → E
 
 ## 3. Prerequisites — Crete host and VMs
 
-Before any Slice A work begins, Crete must be installed and the four Daedalus guests must exist and be reachable. This is environment work, not Daedalus code: a one-time manual host install followed by automated Terraform provisioning modeled on the sibling `homelab/` repo. Slice A begins from the exit criteria at the end of this section.
+Prerequisites is a parallel track, not a gate on code work. Slice A code develops on the operator workstation against local substrates; Prerequisites must be complete by Slice A's acceptance checkpoint (when the first real deploy to Crete happens), but coding can start immediately. This section is environment work, not Daedalus code: a one-time manual host install followed by automated Terraform provisioning modeled on the sibling `homelab/` repo.
 
 ### 3.1 Manual Proxmox host install (Crete)
 
@@ -179,7 +180,9 @@ Slice A starts from this point.
 
 **Proves:** commission → pod work → PR. (Acceptance gate bullet 1, first half.)
 
-**Scope:** starting from the Prerequisites exit state, install Daedalus-specific software on the four guests and land the minimum code path that lets Minos commission a pod via CLI or HTTP and produce a pull request. No Discord, no hibernation, no Mnemosyne, no Argus enforcement.
+**Scope:** land the minimum code path that lets Minos commission a pod via CLI or HTTP and produce a pull request. No Discord, no hibernation, no Mnemosyne, no Argus enforcement.
+
+**Local dev substrates.** Code tasks 4–9 below have no VM dependency and develop entirely on the operator workstation. Infrastructure tasks 1–3 (Postgres, Vector+Loki, k3s) develop against local equivalents — Postgres in Docker, a local Vector+Loki stack in Docker, `k3d` or `kind` for Kubernetes. The real Postgres LXC / Ariadne VM / Labyrinth VM installs happen when Prerequisites (§3) is complete; the acceptance checkpoint runs against those. Until then, everything is a `make dev` away.
 
 ### Tasks
 
