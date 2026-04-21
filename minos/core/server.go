@@ -90,6 +90,9 @@ func New(cfg Config, p provider.Provider, store storage.Store, d dispatch.Dispat
 	for _, o := range opts {
 		o(s)
 	}
+	if s.hermes != nil {
+		s.hermes.Subscribe(s.handleInbound)
+	}
 	return s, nil
 }
 
