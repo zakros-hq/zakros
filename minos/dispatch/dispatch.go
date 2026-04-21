@@ -61,6 +61,22 @@ type PodSpec struct {
 	MemoryRequest string
 	MemoryLimit   string
 	EphemeralDisk string
+
+	// Sidecars are additional containers co-scheduled alongside the
+	// worker. Phase 1 uses this for the Argus heartbeat sidecar; Slice B
+	// adds the thread sidecar.
+	Sidecars []Sidecar
+}
+
+// Sidecar describes a companion container for a pod. Sidecars share the
+// pod network namespace and the envelope/secret volumes.
+type Sidecar struct {
+	Name string
+	Image string
+	// Env: additional env vars beyond the base PlainEnv/SecretEnv the
+	// worker gets; sidecars inherit the same injected secrets via
+	// SecretKeyRef bindings built by the dispatcher.
+	Env map[string]string
 }
 
 // Dispatcher spawns, observes, and tears down Daedalus pods.

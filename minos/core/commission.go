@@ -173,15 +173,16 @@ func (s *Server) Commission(ctx context.Context, req CommissionRequest) (*storag
 func (s *Server) dispatch(ctx context.Context, task *storage.Task) error {
 	runID := uuid.New()
 	spec, err := dispatch.BuildPodSpec(ctx, dispatch.BuilderInput{
-		Envelope:      task.Envelope,
-		TaskID:        task.ID,
-		RunID:         runID,
-		Namespace:     s.namespace,
-		Image:         s.cfg.Project.PluginImage,
-		ProjectID:     s.cfg.Project.ID,
-		WorkspaceSize: task.Envelope.Execution.WorkspaceSize,
-		MinosURL:      s.cfg.MinosPodURL,
-		Resolver:      s.provider,
+		Envelope:          task.Envelope,
+		TaskID:            task.ID,
+		RunID:             runID,
+		Namespace:         s.namespace,
+		Image:             s.cfg.Project.PluginImage,
+		ProjectID:         s.cfg.Project.ID,
+		WorkspaceSize:     task.Envelope.Execution.WorkspaceSize,
+		MinosURL:          s.cfg.MinosPodURL,
+		ArgusSidecarImage: s.cfg.Project.ArgusSidecarImage,
+		Resolver:          s.provider,
 	})
 	if err != nil {
 		_ = s.store.TransitionTask(ctx, task.ID, storage.StateFailed)
@@ -237,6 +238,9 @@ func (s *Server) dispatch(ctx context.Context, task *storage.Task) error {
 		Outcome:  "spawned",
 		Fields:   map[string]string{"task_id": task.ID.String(), "run_id": runID.String(), "pod_name": spec.Name},
 	})
+	if s.argus != nil {
+		s.argus.TrackTask(task, s.namespace)
+	}
 	return nil
 }
 

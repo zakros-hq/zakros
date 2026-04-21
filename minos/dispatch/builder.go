@@ -31,6 +31,10 @@ type BuilderInput struct {
 	// pod → Minos PR-report path.
 	MinosURL string
 
+	// ArgusSidecarImage, when set, adds the Argus heartbeat sidecar
+	// container to the pod. Empty disables the sidecar (Slice A posture).
+	ArgusSidecarImage string
+
 	// Resolver fetches credential plaintext for each InjectedCredential in
 	// the envelope. Typical implementation is the secret provider.
 	Resolver CredentialResolver
@@ -99,6 +103,14 @@ func BuildPodSpec(ctx context.Context, in BuilderInput) (PodSpec, error) {
 	}
 	disk := ephemeralForSize(size)
 
+	var sidecars []Sidecar
+	if in.ArgusSidecarImage != "" {
+		sidecars = append(sidecars, Sidecar{
+			Name:  "argus-sidecar",
+			Image: in.ArgusSidecarImage,
+		})
+	}
+
 	return PodSpec{
 		Name:          "daedalus-" + in.TaskID.String()[:8] + "-" + in.RunID.String()[:8],
 		Namespace:     in.Namespace,
@@ -112,6 +124,7 @@ func BuildPodSpec(ctx context.Context, in BuilderInput) (PodSpec, error) {
 		MemoryRequest: "2Gi",
 		MemoryLimit:   "4Gi",
 		EphemeralDisk: disk,
+		Sidecars:      sidecars,
 	}, nil
 }
 

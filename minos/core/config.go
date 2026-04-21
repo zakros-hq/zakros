@@ -54,7 +54,10 @@ type ProjectConfig struct {
 	PluginImage          string                 `json:"plugin_image"`
 	DefaultWorkspaceSize envelope.WorkspaceSize `json:"default_workspace_size"`
 	DefaultBaseBranch    string                 `json:"default_base_branch"`
-	DefaultBudget        envelope.Budget        `json:"default_budget"`
+	// ArgusSidecarImage, when non-empty, adds the Argus heartbeat sidecar
+	// container to every dispatched pod.
+	ArgusSidecarImage string          `json:"argus_sidecar_image"`
+	DefaultBudget     envelope.Budget `json:"default_budget"`
 	Communication        envelope.Communication `json:"communication"`
 	// ThreadParent is the surface-specific container where new task
 	// threads get created (Discord channel ID, Slack channel ID, etc.).

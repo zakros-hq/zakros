@@ -27,6 +27,7 @@ func (s *Server) routes() http.Handler {
 	mux.Handle("GET /tasks", s.requireAdmin(http.HandlerFunc(s.handleListTasks)))
 	mux.Handle("GET /tasks/{id}", s.requireAdmin(http.HandlerFunc(s.handleGetTask)))
 	mux.Handle("POST /tasks/{id}/pr", s.requirePodAuth(http.HandlerFunc(s.handleReportPR)))
+	mux.Handle("POST /tasks/{id}/heartbeat", s.requirePodAuth(http.HandlerFunc(s.handleHeartbeat)))
 	mux.HandleFunc("POST /webhooks/github", s.handleGithubWebhook)
 	return s.auditMiddleware(mux)
 }
@@ -212,6 +213,21 @@ func (s *Server) handleReportPR(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
+// handleHeartbeat accepts Argus-sidecar heartbeat POSTs and forwards the
+// task id to the watcher. Unknown task ids are no-ops (Argus ignores
+// them), so the endpoint always returns 200 when auth passes.
+func (s *Server) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid task id")
+		return
+	}
+	if s.argus != nil {
+		s.argus.Heartbeat(id)
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
 // githubPullRequestEvent is the subset of GitHub's pull_request event
 // payload Minos cares about for Phase 1 Slice B lifecycle transitions.
 type githubPullRequestEvent struct {
@@ -322,6 +338,9 @@ func (s *Server) handlePullRequestEvent(w http.ResponseWriter, r *http.Request, 
 			"state":   string(target),
 		},
 	})
+	if s.argus != nil {
+		s.argus.UntrackTask(task.ID)
+	}
 	s.postSummary(r.Context(), task, target, ev.PullRequest.HTMLURL)
 	writeJSON(w, http.StatusOK, map[string]string{"status": string(target)})
 }

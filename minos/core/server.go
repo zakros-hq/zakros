@@ -13,6 +13,7 @@ import (
 
 	ghverify "github.com/GoodOlClint/daedalus/cerberus/verification/github"
 	hermescore "github.com/GoodOlClint/daedalus/hermes/core"
+	"github.com/GoodOlClint/daedalus/minos/argus"
 	"github.com/GoodOlClint/daedalus/minos/dispatch"
 	"github.com/GoodOlClint/daedalus/minos/storage"
 	"github.com/GoodOlClint/daedalus/pkg/audit"
@@ -28,6 +29,7 @@ type Server struct {
 	audit       audit.Emitter
 	replayStore ghverify.ReplayStore
 	hermes      *hermescore.Broker
+	argus       *argus.Argus
 	namespace   string
 	now         func() time.Time
 }
@@ -61,6 +63,13 @@ func WithReplayStore(rs ghverify.ReplayStore) Option {
 // surface integration (Slice A posture; CLI intake only).
 func WithHermes(h *hermescore.Broker) Option {
 	return func(s *Server) { s.hermes = h }
+}
+
+// WithArgus wires the bundled watcher so Commission registers new tasks
+// with it and the heartbeat endpoint can deliver sidecar reports.
+// When nil, Argus enforcement is disabled (Slice A posture).
+func WithArgus(a *argus.Argus) Option {
+	return func(s *Server) { s.argus = a }
 }
 
 // New returns a Server wired with its dependencies. It does not start any

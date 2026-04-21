@@ -158,6 +158,31 @@ func buildPod(spec dispatch.PodSpec) *corev1.Pod {
 		resources.Limits[corev1.ResourceEphemeralStorage] = q
 	}
 
+	containers := []corev1.Container{
+		{
+			Name:      "worker",
+			Image:     spec.Image,
+			Env:       envVars,
+			Resources: resources,
+			VolumeMounts: []corev1.VolumeMount{
+				{Name: "envelope", MountPath: "/var/run/daedalus", ReadOnly: true},
+				{Name: "workspace", MountPath: "/workspace"},
+				{Name: "memory", MountPath: "/var/run/daedalus/memory"},
+			},
+		},
+	}
+	for _, sc := range spec.Sidecars {
+		scEnv := append([]corev1.EnvVar(nil), envVars...)
+		for k, v := range sc.Env {
+			scEnv = append(scEnv, corev1.EnvVar{Name: k, Value: v})
+		}
+		containers = append(containers, corev1.Container{
+			Name:  sc.Name,
+			Image: sc.Image,
+			Env:   scEnv,
+		})
+	}
+
 	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      spec.Name,
@@ -185,19 +210,7 @@ func buildPod(spec dispatch.PodSpec) *corev1.Pod {
 					VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
 				},
 			},
-			Containers: []corev1.Container{
-				{
-					Name:      "worker",
-					Image:     spec.Image,
-					Env:       envVars,
-					Resources: resources,
-					VolumeMounts: []corev1.VolumeMount{
-						{Name: "envelope", MountPath: "/var/run/daedalus", ReadOnly: true},
-						{Name: "workspace", MountPath: "/workspace"},
-						{Name: "memory", MountPath: "/var/run/daedalus/memory"},
-					},
-				},
-			},
+			Containers: containers,
 		},
 	}
 }

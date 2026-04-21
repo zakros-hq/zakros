@@ -1,4 +1,4 @@
-.PHONY: all build test vet lint fmt tidy clean dev-postgres dev-postgres-stop dev-k3d dev-k3d-stop plugin-claude-code plugin-shellcheck tf-fmt tf-validate tf-plan tf-apply tf-inventory
+.PHONY: all build test vet lint fmt tidy clean dev-postgres dev-postgres-stop dev-k3d dev-k3d-stop plugin-claude-code plugin-shellcheck sidecar-argus tf-fmt tf-validate tf-plan tf-apply tf-inventory
 
 GO := go
 LINTER := golangci-lint
@@ -54,6 +54,11 @@ PLUGIN_IMAGE_REPO ?= ghcr.io/goodolclint/daedalus-claude-code
 
 plugin-claude-code:
 	docker build -t $(PLUGIN_IMAGE_REPO):$(PLUGIN_IMAGE_TAG) ./agents/claude-code
+
+SIDECAR_ARGUS_REPO ?= ghcr.io/goodolclint/daedalus-argus-sidecar
+
+sidecar-argus:
+	docker build -f agents/sidecar/argus/Dockerfile -t $(SIDECAR_ARGUS_REPO):$(PLUGIN_IMAGE_TAG) .
 
 plugin-shellcheck:
 	bash -n agents/claude-code/entrypoint.sh

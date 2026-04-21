@@ -16,6 +16,7 @@ import (
 	ghverify "github.com/GoodOlClint/daedalus/cerberus/verification/github"
 	hermescore "github.com/GoodOlClint/daedalus/hermes/core"
 	hermesdiscord "github.com/GoodOlClint/daedalus/hermes/plugins/discord"
+	"github.com/GoodOlClint/daedalus/minos/argus"
 	"github.com/GoodOlClint/daedalus/minos/core"
 	"github.com/GoodOlClint/daedalus/minos/dispatch"
 	"github.com/GoodOlClint/daedalus/minos/dispatch/fakedispatch"
@@ -76,7 +77,12 @@ func run(configPath, providerPath string, memMode, fakeDispatch bool, kubeconfig
 		return err
 	}
 
-	opts := []core.Option{core.WithReplayStore(replayStore)}
+	a, err := argus.New(argus.DefaultConfig(), dispatcher, store, hermes, em)
+	if err != nil {
+		return fmt.Errorf("argus: %w", err)
+	}
+
+	opts := []core.Option{core.WithReplayStore(replayStore), core.WithArgus(a)}
 	if hermes != nil {
 		opts = append(opts, core.WithHermes(hermes))
 	}
@@ -96,6 +102,8 @@ func run(configPath, providerPath string, memMode, fakeDispatch bool, kubeconfig
 			_ = hermes.Stop(shutdownCtx)
 		}()
 	}
+	a.Start(ctx)
+	defer a.Stop()
 
 	if err := srv.Run(ctx); err != nil && err != context.Canceled {
 		return err
