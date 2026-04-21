@@ -1,4 +1,4 @@
-.PHONY: all build test vet lint fmt tidy clean dev-postgres dev-postgres-stop dev-k3d dev-k3d-stop
+.PHONY: all build test vet lint fmt tidy clean dev-postgres dev-postgres-stop dev-k3d dev-k3d-stop plugin-claude-code plugin-shellcheck
 
 GO := go
 LINTER := golangci-lint
@@ -46,3 +46,15 @@ dev-k3d:
 
 dev-k3d-stop:
 	k3d cluster delete daedalus-dev
+
+# Plugin images
+
+PLUGIN_IMAGE_TAG ?= local
+PLUGIN_IMAGE_REPO ?= ghcr.io/goodolclint/daedalus-claude-code
+
+plugin-claude-code:
+	docker build -t $(PLUGIN_IMAGE_REPO):$(PLUGIN_IMAGE_TAG) ./agents/claude-code
+
+plugin-shellcheck:
+	bash -n agents/claude-code/entrypoint.sh
+	@command -v shellcheck >/dev/null && shellcheck agents/claude-code/entrypoint.sh || echo "shellcheck not installed; only bash -n ran"
