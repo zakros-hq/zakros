@@ -3,10 +3,14 @@ package core_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/GoodOlClint/daedalus/minos/core"
+	"github.com/GoodOlClint/daedalus/minos/dispatch"
+	"github.com/GoodOlClint/daedalus/minos/dispatch/fakedispatch"
+	"github.com/GoodOlClint/daedalus/minos/storage"
 	"github.com/GoodOlClint/daedalus/minos/storage/memstore"
 	"github.com/GoodOlClint/daedalus/pkg/audit"
 	"github.com/GoodOlClint/daedalus/pkg/envelope"
@@ -33,12 +37,23 @@ func (p *staticProvider) AuditList(context.Context, string) ([]provider.AuditEnt
 	return nil, nil
 }
 
-func newTestServer(t *testing.T) (*core.Server, *memstore.Store, []byte) {
+// testServerKit bundles the commonly-accessed pieces of the test rig so
+// individual tests can reach into the dispatcher or store without the
+// helper signature growing unbounded.
+type testServerKit struct {
+	server       *core.Server
+	store        *memstore.Store
+	dispatcher   *fakedispatch.Dispatcher
+	bearerSecret []byte
+}
+
+func newTestServer(t *testing.T) testServerKit {
 	t.Helper()
 	bearerSecret := []byte("bearer-secret-for-tests")
 	prov := &staticProvider{refs: map[string][]byte{
 		"minos-bearer-secret": bearerSecret,
 		"minos-admin-token":   []byte("admin-token"),
+		"github-app-token":    []byte("ghs_injected"),
 	}}
 	cfg := core.Config{
 		ListenAddr:      ":0",
@@ -79,13 +94,14 @@ func newTestServer(t *testing.T) (*core.Server, *memstore.Store, []byte) {
 		},
 	}
 	store := memstore.New(nil)
-	srv, err := core.New(cfg, prov, store, audit.NewWriterEmitter("minos-test", discardWriter{}),
+	disp := fakedispatch.New()
+	srv, err := core.New(cfg, prov, store, disp, audit.NewWriterEmitter("minos-test", discardWriter{}),
 		core.WithClock(func() time.Time { return time.Date(2026, 4, 21, 12, 0, 0, 0, time.UTC) }),
 	)
 	if err != nil {
 		t.Fatalf("new server: %v", err)
 	}
-	return srv, store, bearerSecret
+	return testServerKit{server: srv, store: store, dispatcher: disp, bearerSecret: bearerSecret}
 }
 
 type discardWriter struct{}
@@ -93,7 +109,8 @@ type discardWriter struct{}
 func (discardWriter) Write(p []byte) (int, error) { return len(p), nil }
 
 func TestCommissionValidates(t *testing.T) {
-	srv, _, _ := newTestServer(t)
+	kit := newTestServer(t)
+	srv := kit.server
 	ctx := context.Background()
 
 	cases := []struct {
@@ -129,7 +146,9 @@ func TestCommissionValidates(t *testing.T) {
 }
 
 func TestCommissionComposesEnvelope(t *testing.T) {
-	srv, _, bearerSecret := newTestServer(t)
+	kit := newTestServer(t)
+	srv := kit.server
+	bearerSecret := kit.bearerSecret
 	ctx := context.Background()
 
 	req := core.CommissionRequest{
@@ -186,7 +205,8 @@ func TestCommissionComposesEnvelope(t *testing.T) {
 }
 
 func TestCommissionInputsDefault(t *testing.T) {
-	srv, _, _ := newTestServer(t)
+	kit := newTestServer(t)
+	srv := kit.server
 	req := core.CommissionRequest{
 		TaskType:  envelope.TaskTypeCode,
 		Brief:     envelope.Brief{Summary: "x"},
@@ -200,4 +220,130 @@ func TestCommissionInputsDefault(t *testing.T) {
 	if err := json.Unmarshal(task.Envelope.Inputs, &inputs); err != nil {
 		t.Fatalf("inputs not valid JSON: %v", err)
 	}
+}
+
+func TestCommissionSpawnsPodAndTransitionsRunning(t *testing.T) {
+	kit := newTestServer(t)
+	req := core.CommissionRequest{
+		TaskType:  envelope.TaskTypeCode,
+		Brief:     envelope.Brief{Summary: "fix it"},
+		Execution: core.ExecutionRequest{RepoURL: "https://example.com/repo", Branch: "fix/a"},
+		Origin:    envelope.Origin{Surface: "internal", RequestID: "t-1", Requester: "admin"},
+	}
+	task, err := kit.server.Commission(context.Background(), req)
+	if err != nil {
+		t.Fatalf("commission: %v", err)
+	}
+	if task.State != storage.StateRunning {
+		t.Errorf("expected running state, got %s", task.State)
+	}
+	if task.PodName == nil || *task.PodName == "" {
+		t.Fatal("pod name not set")
+	}
+	if task.RunID == nil {
+		t.Fatal("run id not set")
+	}
+
+	pods := kit.dispatcher.Pods()
+	if len(pods) != 1 {
+		t.Fatalf("expected 1 pod in dispatcher, got %d", len(pods))
+	}
+	pod := pods[0]
+	if pod.Spec.SecretEnv["GITHUB_TOKEN"] != "ghs_injected" {
+		t.Errorf("injected credential not resolved into spec: %q", pod.Spec.SecretEnv["GITHUB_TOKEN"])
+	}
+	if pod.Spec.Labels["daedalus.project/task-id"] != task.ID.String() {
+		t.Errorf("task-id label missing from spec")
+	}
+
+	// Store agrees with what Commission returned.
+	stored, err := kit.store.GetTask(context.Background(), task.ID)
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if stored.State != storage.StateRunning {
+		t.Errorf("store state: %s", stored.State)
+	}
+}
+
+func TestCommissionDispatchFailureMarksFailed(t *testing.T) {
+	kit := newTestServer(t)
+	kit.dispatcher.SpawnError = errors.New("k3s pod quota exceeded")
+
+	req := core.CommissionRequest{
+		TaskType:  envelope.TaskTypeCode,
+		Brief:     envelope.Brief{Summary: "fix it"},
+		Execution: core.ExecutionRequest{RepoURL: "https://example.com/repo", Branch: "fix/a"},
+		Origin:    envelope.Origin{Surface: "internal", RequestID: "t-1", Requester: "admin"},
+	}
+	task, err := kit.server.Commission(context.Background(), req)
+	if err == nil {
+		t.Fatal("expected dispatch failure to propagate")
+	}
+	if task == nil {
+		t.Fatal("task should be returned even on dispatch failure so operator can see state")
+	}
+	stored, err := kit.store.GetTask(context.Background(), task.ID)
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if stored.State != storage.StateFailed {
+		t.Errorf("expected failed state, got %s", stored.State)
+	}
+	if len(kit.dispatcher.Pods()) != 0 {
+		t.Errorf("expected no pods after spawn failure, got %d", len(kit.dispatcher.Pods()))
+	}
+}
+
+func TestCommissionUnresolvableCredentialFails(t *testing.T) {
+	kit := newTestServer(t)
+	// Break the provider by replacing the server's provider lookup for the
+	// GITHUB_TOKEN ref — simulate an operator forgetting to seed the secret.
+	// Easiest way: use a fresh server with a provider that lacks the entry.
+	bearerSecret := []byte("bearer-secret-for-tests")
+	prov := &staticProvider{refs: map[string][]byte{
+		"minos-bearer-secret": bearerSecret,
+		"minos-admin-token":   []byte("admin-token"),
+		// Intentionally missing github-app-token.
+	}}
+	cfg := core.Config{
+		ListenAddr:      ":0",
+		BearerSecretRef: "minos-bearer-secret",
+		AdminTokenRef:   "minos-admin-token",
+		Admin:           core.AdminIdentity{Surface: "discord", SurfaceID: "admin-id"},
+		Project: core.ProjectConfig{
+			ID:                   "p",
+			Backend:              "claude-code",
+			PluginImage:          "img",
+			DefaultWorkspaceSize: envelope.WorkspaceSmall,
+			DefaultBaseBranch:    "main",
+			Communication:        envelope.Communication{HermesURL: "http://x", ArgusIngestURL: "http://x", AriadneIngestURL: "http://x"},
+			Capabilities: core.CapabilitiesDefaults{
+				InjectedCredentials: []envelope.InjectedCredential{
+					{EnvVar: "GITHUB_TOKEN", CredentialsRef: "github-app-token"},
+				},
+			},
+		},
+	}
+	_ = kit // silence unused
+	store := memstore.New(nil)
+	srv, err := core.New(cfg, prov, store, fakedispatch.New(), audit.NewWriterEmitter("t", discardWriter{}))
+	if err != nil {
+		t.Fatalf("new: %v", err)
+	}
+	req := core.CommissionRequest{
+		TaskType:  envelope.TaskTypeCode,
+		Brief:     envelope.Brief{Summary: "x"},
+		Execution: core.ExecutionRequest{RepoURL: "https://example.com/r", Branch: "f/a"},
+	}
+	_, err = srv.Commission(context.Background(), req)
+	if err == nil {
+		t.Fatal("expected credential resolution failure to propagate")
+	}
+	// Task should still exist but in failed state.
+	tasks, _ := store.ListTasks(context.Background(), nil, 0)
+	if len(tasks) != 1 || tasks[0].State != storage.StateFailed {
+		t.Errorf("expected single failed task, got %+v", tasks)
+	}
+	var _ dispatch.Dispatcher = fakedispatch.New() // keep dispatch import load-bearing for this file
 }

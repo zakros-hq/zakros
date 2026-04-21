@@ -8,7 +8,9 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/GoodOlClint/daedalus/minos/dispatch"
 	"github.com/GoodOlClint/daedalus/minos/storage"
+	"github.com/GoodOlClint/daedalus/pkg/audit"
 	"github.com/GoodOlClint/daedalus/pkg/envelope"
 	"github.com/GoodOlClint/daedalus/pkg/jwt"
 )
@@ -132,7 +134,84 @@ func (s *Server) Commission(ctx context.Context, req CommissionRequest) (*storag
 	if err := s.store.InsertTask(ctx, task); err != nil {
 		return nil, fmt.Errorf("commission: insert: %w", err)
 	}
+
+	if err := s.dispatch(ctx, task); err != nil {
+		return task, err
+	}
 	return task, nil
+}
+
+// dispatch builds the pod spec, spawns the pod, and records the run against
+// the task. On any failure after InsertTask, the task is transitioned to
+// StateFailed so the operator sees why the commission did not produce a
+// running pod.
+func (s *Server) dispatch(ctx context.Context, task *storage.Task) error {
+	runID := uuid.New()
+	spec, err := dispatch.BuildPodSpec(ctx, dispatch.BuilderInput{
+		Envelope:      task.Envelope,
+		TaskID:        task.ID,
+		RunID:         runID,
+		Namespace:     s.namespace,
+		Image:         s.cfg.Project.PluginImage,
+		ProjectID:     s.cfg.Project.ID,
+		WorkspaceSize: task.Envelope.Execution.WorkspaceSize,
+		Resolver:      s.provider,
+	})
+	if err != nil {
+		_ = s.store.TransitionTask(ctx, task.ID, storage.StateFailed)
+		s.audit.Emit(audit.Event{
+			Category: "dispatch",
+			Outcome:  "build-failed",
+			Message:  err.Error(),
+			Fields:   map[string]string{"task_id": task.ID.String()},
+		})
+		return fmt.Errorf("commission: build pod spec: %w", err)
+	}
+
+	if err := s.dispatcher.SpawnPod(ctx, spec); err != nil {
+		_ = s.store.TransitionTask(ctx, task.ID, storage.StateFailed)
+		s.audit.Emit(audit.Event{
+			Category: "dispatch",
+			Outcome:  "spawn-failed",
+			Message:  err.Error(),
+			Fields:   map[string]string{"task_id": task.ID.String(), "pod_name": spec.Name},
+		})
+		return fmt.Errorf("commission: spawn pod: %w", err)
+	}
+
+	if err := s.store.SetTaskRun(ctx, task.ID, runID, spec.Name); err != nil {
+		// Pod is up but state is broken — leave it; startup reconciliation
+		// adopts or tombstones it. Don't roll back the pod; audit tells us.
+		s.audit.Emit(audit.Event{
+			Category: "dispatch",
+			Outcome:  "setrun-failed",
+			Message:  err.Error(),
+			Fields:   map[string]string{"task_id": task.ID.String(), "pod_name": spec.Name},
+		})
+		return fmt.Errorf("commission: record run: %w", err)
+	}
+	if err := s.store.TransitionTask(ctx, task.ID, storage.StateRunning); err != nil {
+		s.audit.Emit(audit.Event{
+			Category: "dispatch",
+			Outcome:  "transition-failed",
+			Message:  err.Error(),
+			Fields:   map[string]string{"task_id": task.ID.String(), "pod_name": spec.Name},
+		})
+		return fmt.Errorf("commission: transition to running: %w", err)
+	}
+	// Reflect the live state on the in-memory task returned to the caller.
+	task.State = storage.StateRunning
+	task.RunID = &runID
+	pn := spec.Name
+	task.PodName = &pn
+	now := s.now()
+	task.StartedAt = &now
+	s.audit.Emit(audit.Event{
+		Category: "dispatch",
+		Outcome:  "spawned",
+		Fields:   map[string]string{"task_id": task.ID.String(), "run_id": runID.String(), "pod_name": spec.Name},
+	})
+	return nil
 }
 
 // composeCapabilities builds the envelope capabilities block for a new pod,

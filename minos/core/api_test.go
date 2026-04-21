@@ -18,7 +18,7 @@ import (
 // The admin token is "admin-token" per newTestServer.
 func startTestHTTPServer(t *testing.T) (*httptest.Server, *core.Server) {
 	t.Helper()
-	srv, _, _ := newTestServer(t)
+	srv := newTestServer(t).server
 	ts := httptest.NewServer(core.TestingHTTPHandler(srv))
 	t.Cleanup(ts.Close)
 	return ts, srv
@@ -147,7 +147,7 @@ func TestGetTaskNotFound(t *testing.T) {
 
 // Smoke-test the Run lifecycle — start, wait a beat, cancel, expect clean shutdown.
 func TestRunStartsAndStops(t *testing.T) {
-	srv, _, _ := newTestServer(t)
+	srv := newTestServer(t).server
 	ctx, cancel := context.WithCancel(context.Background())
 
 	done := make(chan error, 1)

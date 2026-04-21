@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/GoodOlClint/daedalus/minos/dispatch"
 	"github.com/GoodOlClint/daedalus/minos/storage"
 	"github.com/GoodOlClint/daedalus/pkg/audit"
 	"github.com/GoodOlClint/daedalus/pkg/provider"
@@ -18,11 +19,13 @@ import (
 
 // Server is the Minos core service instance.
 type Server struct {
-	cfg      Config
-	provider provider.Provider
-	store    storage.Store
-	audit    audit.Emitter
-	now      func() time.Time
+	cfg        Config
+	provider   provider.Provider
+	store      storage.Store
+	dispatcher dispatch.Dispatcher
+	audit      audit.Emitter
+	namespace  string
+	now        func() time.Time
 }
 
 // Option configures a Server at construction time.
@@ -33,24 +36,35 @@ func WithClock(now func() time.Time) Option {
 	return func(s *Server) { s.now = now }
 }
 
+// WithNamespace overrides the Kubernetes namespace used for dispatched pods.
+// Default is "daedalus".
+func WithNamespace(ns string) Option {
+	return func(s *Server) { s.namespace = ns }
+}
+
 // New returns a Server wired with its dependencies. It does not start any
 // I/O; call Run.
-func New(cfg Config, p provider.Provider, store storage.Store, em audit.Emitter, opts ...Option) (*Server, error) {
+func New(cfg Config, p provider.Provider, store storage.Store, d dispatch.Dispatcher, em audit.Emitter, opts ...Option) (*Server, error) {
 	if p == nil {
 		return nil, errors.New("minos/core: provider is required")
 	}
 	if store == nil {
 		return nil, errors.New("minos/core: store is required")
 	}
+	if d == nil {
+		return nil, errors.New("minos/core: dispatcher is required")
+	}
 	if em == nil {
 		return nil, errors.New("minos/core: audit emitter is required")
 	}
 	s := &Server{
-		cfg:      cfg,
-		provider: p,
-		store:    store,
-		audit:    em,
-		now:      func() time.Time { return time.Now().UTC() },
+		cfg:        cfg,
+		provider:   p,
+		store:      store,
+		dispatcher: d,
+		audit:      em,
+		namespace:  "daedalus",
+		now:        func() time.Time { return time.Now().UTC() },
 	}
 	for _, o := range opts {
 		o(s)
