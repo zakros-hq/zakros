@@ -44,7 +44,12 @@ type ProjectConfig struct {
 	DefaultBaseBranch    string                 `json:"default_base_branch"`
 	DefaultBudget        envelope.Budget        `json:"default_budget"`
 	Communication        envelope.Communication `json:"communication"`
-	Capabilities         CapabilitiesDefaults   `json:"capabilities"`
+	// ThreadParent is the surface-specific container where new task
+	// threads get created (Discord channel ID, Slack channel ID, etc.).
+	// Required when a Hermes plugin is wired in and CreateThread is
+	// expected to succeed; optional otherwise.
+	ThreadParent string               `json:"thread_parent"`
+	Capabilities CapabilitiesDefaults `json:"capabilities"`
 }
 
 // CapabilitiesDefaults are the project-wide capability defaults composed

@@ -3,11 +3,13 @@ package core
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 
+	hermescore "github.com/GoodOlClint/daedalus/hermes/core"
 	"github.com/GoodOlClint/daedalus/minos/dispatch"
 	"github.com/GoodOlClint/daedalus/minos/storage"
 	"github.com/GoodOlClint/daedalus/pkg/audit"
@@ -77,8 +79,31 @@ func (s *Server) Commission(ctx context.Context, req CommissionRequest) (*storag
 	}
 
 	comm := proj.Communication
-	// ThreadRef is filled when Hermes creates the task thread (Slice B).
-	// Phase 1 Slice A leaves it empty; the schema allows empty string.
+	// Create the task thread via Hermes when a broker is wired in. When
+	// the configured surface has no plugin registered (Slice A posture:
+	// no Discord plugin), leave thread_ref empty — CLI-driven flow.
+	if s.hermes != nil && comm.ThreadSurface != "" {
+		threadRef, err := s.hermes.CreateThread(ctx, comm.ThreadSurface, hermescore.CreateThreadRequest{
+			Parent: proj.ThreadParent,
+			Title:  fmt.Sprintf("task-%s", taskID.String()[:8]),
+			Opener: fmt.Sprintf("Task commissioned: %s", req.Brief.Summary),
+		})
+		switch {
+		case err == nil:
+			comm.ThreadRef = threadRef
+		case errors.Is(err, hermescore.ErrNoPlugin):
+			// Surface plugin not registered — Slice A posture; proceed
+			// without a thread_ref. The audit event makes the degradation
+			// visible.
+			s.audit.Emit(audit.Event{
+				Category: "hermes",
+				Outcome:  "no-plugin",
+				Fields:   map[string]string{"surface": comm.ThreadSurface, "task_id": taskID.String()},
+			})
+		default:
+			return nil, fmt.Errorf("commission: create thread: %w", err)
+		}
+	}
 
 	capabilities, err := s.composeCapabilities(ctx, taskID, proj)
 	if err != nil {

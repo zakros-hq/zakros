@@ -12,6 +12,7 @@ import (
 	"time"
 
 	ghverify "github.com/GoodOlClint/daedalus/cerberus/verification/github"
+	hermescore "github.com/GoodOlClint/daedalus/hermes/core"
 	"github.com/GoodOlClint/daedalus/minos/dispatch"
 	"github.com/GoodOlClint/daedalus/minos/storage"
 	"github.com/GoodOlClint/daedalus/pkg/audit"
@@ -26,6 +27,7 @@ type Server struct {
 	dispatcher  dispatch.Dispatcher
 	audit       audit.Emitter
 	replayStore ghverify.ReplayStore
+	hermes      *hermescore.Broker
 	namespace   string
 	now         func() time.Time
 }
@@ -50,6 +52,15 @@ func WithNamespace(ns string) Option {
 // production.
 func WithReplayStore(rs ghverify.ReplayStore) Option {
 	return func(s *Server) { s.replayStore = rs }
+}
+
+// WithHermes wires the Hermes broker into the server. When set,
+// Commission creates a task thread on the configured surface and
+// populates envelope.Communication.ThreadRef; webhook handlers post
+// task summaries back to that thread. When nil, Minos runs without
+// surface integration (Slice A posture; CLI intake only).
+func WithHermes(h *hermescore.Broker) Option {
+	return func(s *Server) { s.hermes = h }
 }
 
 // New returns a Server wired with its dependencies. It does not start any

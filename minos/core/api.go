@@ -1,6 +1,7 @@
 package core
 
 import (
+	"context"
 	"crypto/subtle"
 	"encoding/json"
 	"errors"
@@ -12,6 +13,7 @@ import (
 	"github.com/google/uuid"
 
 	ghverify "github.com/GoodOlClint/daedalus/cerberus/verification/github"
+	hermescore "github.com/GoodOlClint/daedalus/hermes/core"
 	"github.com/GoodOlClint/daedalus/minos/storage"
 	"github.com/GoodOlClint/daedalus/pkg/audit"
 	"github.com/GoodOlClint/daedalus/pkg/jwt"
@@ -320,7 +322,38 @@ func (s *Server) handlePullRequestEvent(w http.ResponseWriter, r *http.Request, 
 			"state":   string(target),
 		},
 	})
+	s.postSummary(r.Context(), task, target, ev.PullRequest.HTMLURL)
 	writeJSON(w, http.StatusOK, map[string]string{"status": string(target)})
+}
+
+// postSummary posts the task-terminal message to the task thread via
+// Hermes. Failure is non-fatal — audit records the attempt and the task
+// remains in the terminal state the webhook set.
+func (s *Server) postSummary(ctx context.Context, task *storage.Task, target storage.State, prURL string) {
+	if s.hermes == nil || task.Envelope == nil || task.Envelope.Communication.ThreadRef == "" {
+		return
+	}
+	var content string
+	switch target {
+	case storage.StateCompleted:
+		content = fmt.Sprintf("Task completed — PR merged: %s", prURL)
+	case storage.StateFailed:
+		content = fmt.Sprintf("Task failed — PR closed without merge: %s", prURL)
+	default:
+		return
+	}
+	err := s.hermes.PostToThread(ctx, task.Envelope.Communication.ThreadSurface, task.Envelope.Communication.ThreadRef, hermescore.Message{
+		Kind:    hermescore.KindSummary,
+		Content: content,
+	})
+	if err != nil {
+		s.audit.Emit(audit.Event{
+			Category: "hermes",
+			Outcome:  "post-summary-failed",
+			Message:  err.Error(),
+			Fields:   map[string]string{"task_id": task.ID.String(), "thread": task.Envelope.Communication.ThreadRef},
+		})
+	}
 }
 
 // taskResponse is the JSON shape the API returns for task records.
