@@ -1,0 +1,148 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://daedalus.local/schemas/envelope.v1.json",
+  "title": "Daedalus Task Envelope",
+  "description": "Task envelope Minos dispatches to worker backend pods. Authoritative per architecture.md §8 Task Definition.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "id",
+    "project_id",
+    "created_at",
+    "task_type",
+    "backend",
+    "origin",
+    "brief",
+    "inputs",
+    "execution",
+    "communication",
+    "capabilities",
+    "budget",
+    "acceptance"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": "1" },
+    "id": { "type": "string", "format": "uuid" },
+    "parent_id": { "type": ["string", "null"], "format": "uuid" },
+    "project_id": { "type": "string", "minLength": 1 },
+    "created_at": { "type": "string", "format": "date-time" },
+    "task_type": {
+      "type": "string",
+      "enum": ["code", "infra", "inference-tuning", "research", "test"]
+    },
+    "backend": { "type": "string", "minLength": 1 },
+
+    "origin": {
+      "type": "object",
+      "required": ["surface", "request_id", "requester"],
+      "additionalProperties": false,
+      "properties": {
+        "surface": { "type": "string" },
+        "request_id": { "type": "string" },
+        "requester": { "type": "string" }
+      }
+    },
+
+    "brief": {
+      "type": "object",
+      "required": ["summary", "detail"],
+      "additionalProperties": false,
+      "properties": {
+        "summary": { "type": "string" },
+        "detail": { "type": "string" }
+      }
+    },
+
+    "inputs": { "type": "object" },
+
+    "execution": {
+      "type": "object",
+      "required": ["repo_url", "branch", "base_branch", "workspace_size"],
+      "additionalProperties": false,
+      "properties": {
+        "repo_url": { "type": "string", "format": "uri" },
+        "branch": { "type": "string" },
+        "base_branch": { "type": "string" },
+        "workspace_size": { "type": "string", "enum": ["small", "medium", "large"] }
+      }
+    },
+
+    "communication": {
+      "type": "object",
+      "required": [
+        "thread_surface",
+        "thread_ref",
+        "hermes_url",
+        "argus_ingest_url",
+        "ariadne_ingest_url"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "thread_surface": { "type": "string" },
+        "thread_ref": { "type": "string" },
+        "hermes_url": { "type": "string", "format": "uri" },
+        "argus_ingest_url": { "type": "string", "format": "uri" },
+        "ariadne_ingest_url": { "type": "string", "format": "uri" }
+      }
+    },
+
+    "capabilities": {
+      "type": "object",
+      "required": ["injected_credentials", "mcp_endpoints", "mcp_auth_token"],
+      "additionalProperties": false,
+      "properties": {
+        "injected_credentials": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["env_var", "credentials_ref"],
+            "additionalProperties": false,
+            "properties": {
+              "env_var": { "type": "string" },
+              "credentials_ref": { "type": "string" }
+            }
+          }
+        },
+        "mcp_endpoints": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "url", "scopes"],
+            "additionalProperties": false,
+            "properties": {
+              "name": { "type": "string" },
+              "url": { "type": "string", "format": "uri" },
+              "scopes": {
+                "type": "array",
+                "items": { "type": "string" }
+              }
+            }
+          }
+        },
+        "mcp_auth_token": { "type": "string", "minLength": 1 }
+      }
+    },
+
+    "context_ref": { "type": ["string", "null"] },
+
+    "budget": {
+      "type": "object",
+      "required": [
+        "max_tokens",
+        "max_wall_clock_seconds",
+        "warning_threshold_pct",
+        "escalation_threshold_pct"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "max_tokens": { "type": "integer", "minimum": 0 },
+        "max_wall_clock_seconds": { "type": "integer", "minimum": 0 },
+        "warning_threshold_pct": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "escalation_threshold_pct": { "type": "integer", "minimum": 0, "maximum": 100 }
+      }
+    },
+
+    "acceptance": { "type": "object" }
+  }
+}
