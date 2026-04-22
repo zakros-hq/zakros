@@ -66,6 +66,10 @@ type ProjectConfig struct {
 	ID                   string                 `json:"id"`
 	Backend              string                 `json:"backend"`
 	PluginImage          string                 `json:"plugin_image"`
+	// AgentMentionHandle is the GitHub login/app-slug that, when @mentioned
+	// in a PR comment (issue_comment event), triggers a respawn of the
+	// bound task. Empty disables @mention respawning.
+	AgentMentionHandle string `json:"agent_mention_handle"`
 	DefaultWorkspaceSize envelope.WorkspaceSize `json:"default_workspace_size"`
 	DefaultBaseBranch    string                 `json:"default_base_branch"`
 	// ArgusSidecarImage, when non-empty, adds the Argus heartbeat sidecar

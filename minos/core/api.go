@@ -370,6 +370,8 @@ func (s *Server) handleGithubWebhook(w http.ResponseWriter, r *http.Request) {
 		s.handlePullRequestEvent(w, r, event.Body)
 	case "pull_request_review":
 		s.handlePullRequestReviewEvent(w, r, event.Body)
+	case "issue_comment":
+		s.handleIssueCommentEvent(w, r, event.Body)
 	default:
 		s.audit.Emit(audit.Event{
 			Category: "webhook",
@@ -457,6 +459,99 @@ type githubPullRequestReviewEvent struct {
 	PullRequest struct {
 		HTMLURL string `json:"html_url"`
 	} `json:"pull_request"`
+}
+
+// githubIssueCommentEvent is the subset of the issue_comment payload
+// Slice C consumes. Only comments on pull requests (not plain issues)
+// and only actions of "created" fire the @mention respawn path.
+type githubIssueCommentEvent struct {
+	Action string `json:"action"`
+	Issue  struct {
+		PullRequest *struct {
+			HTMLURL string `json:"html_url"`
+		} `json:"pull_request"`
+	} `json:"issue"`
+	Comment struct {
+		Body string `json:"body"`
+		User struct {
+			Login string `json:"login"`
+		} `json:"user"`
+	} `json:"comment"`
+}
+
+// handleIssueCommentEvent respawns the bound task when a PR comment
+// @mentions the configured agent handle. Comments on plain issues (no
+// pull_request field) are ignored; same for edits/deletions and
+// self-authored comments (the agent's own PR summary).
+func (s *Server) handleIssueCommentEvent(w http.ResponseWriter, r *http.Request, body []byte) {
+	handle := strings.TrimSpace(s.cfg.Project.AgentMentionHandle)
+	if handle == "" {
+		writeJSON(w, http.StatusOK, map[string]string{"status": "mention-disabled"})
+		return
+	}
+	var ev githubIssueCommentEvent
+	if err := json.Unmarshal(body, &ev); err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("parse issue_comment: %v", err))
+		return
+	}
+	if ev.Action != "created" || ev.Issue.PullRequest == nil {
+		writeJSON(w, http.StatusOK, map[string]string{"status": "ignored"})
+		return
+	}
+	// Ignore comments authored by the agent itself — the bot's own PR
+	// summary shouldn't trigger respawn.
+	if strings.EqualFold(ev.Comment.User.Login, handle) {
+		writeJSON(w, http.StatusOK, map[string]string{"status": "self-authored"})
+		return
+	}
+	// Case-insensitive @mention match. GitHub mentions are "@<login>"
+	// with word boundaries; the simple contains-check catches the
+	// common case without over-matching in code blocks.
+	mention := "@" + handle
+	if !strings.Contains(strings.ToLower(ev.Comment.Body), strings.ToLower(mention)) {
+		writeJSON(w, http.StatusOK, map[string]string{"status": "no-mention"})
+		return
+	}
+
+	task, err := s.store.FindTaskByPRURL(r.Context(), ev.Issue.PullRequest.HTMLURL)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			s.audit.Emit(audit.Event{
+				Category: "webhook",
+				Outcome:  "mention-no-task",
+				Fields:   map[string]string{"pr": ev.Issue.PullRequest.HTMLURL},
+			})
+			writeJSON(w, http.StatusOK, map[string]string{"status": "no-matching-task"})
+			return
+		}
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if task.State != storage.StateAwaitingReview {
+		s.audit.Emit(audit.Event{
+			Category: "webhook",
+			Outcome:  "mention-wrong-state",
+			Fields:   map[string]string{"task_id": task.ID.String(), "state": string(task.State)},
+		})
+		writeJSON(w, http.StatusOK, map[string]string{"status": string(task.State)})
+		return
+	}
+	if _, err := s.Respawn(r.Context(), task.ID); err != nil {
+		s.audit.Emit(audit.Event{
+			Category: "webhook",
+			Outcome:  "mention-respawn-failed",
+			Message:  err.Error(),
+			Fields:   map[string]string{"task_id": task.ID.String()},
+		})
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	s.audit.Emit(audit.Event{
+		Category: "webhook",
+		Outcome:  "mention-respawn",
+		Fields:   map[string]string{"task_id": task.ID.String(), "user": ev.Comment.User.Login},
+	})
+	writeJSON(w, http.StatusOK, map[string]string{"status": "respawned"})
 }
 
 // handlePullRequestReviewEvent drives hibernation → respawn on qualifying

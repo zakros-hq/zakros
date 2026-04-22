@@ -42,6 +42,7 @@ func newTestServerWithHermes(t *testing.T) (kit testServerKit, plugin *fakeplugi
 			ID:                   "test-project",
 			Backend:              "claude-code",
 			PluginImage:          "ghcr.io/example/plugin:latest",
+			AgentMentionHandle:   "daedalus-bot",
 			DefaultWorkspaceSize: envelope.WorkspaceSmall,
 			DefaultBaseBranch:    "main",
 			ThreadParent:         "channel-ops",
