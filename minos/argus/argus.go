@@ -85,6 +85,7 @@ type Argus struct {
 	store      storage.Store
 	hermes     *hermescore.Broker
 	audit      audit.Emitter
+	persister  Persister
 	now        func() time.Time
 
 	mu    sync.Mutex
@@ -128,6 +129,14 @@ func (a *Argus) WithClock(now func() time.Time) *Argus {
 	return a
 }
 
+// WithPersister wires a state persister so a Minos restart can rehydrate
+// in-flight pod tracking. When nil, Argus runs in-memory only — accepted
+// posture for -mem-store local dev.
+func (a *Argus) WithPersister(p Persister) *Argus {
+	a.persister = p
+	return a
+}
+
 // TrackTask begins tracking a newly-running task. Called by core.Server
 // after a successful dispatch.
 func (a *Argus) TrackTask(t *storage.Task, namespace string) {
@@ -160,6 +169,7 @@ func (a *Argus) TrackTask(t *storage.Task, namespace string) {
 	a.mu.Lock()
 	a.pods[t.ID] = st
 	a.mu.Unlock()
+	a.persistOne(st)
 }
 
 // UntrackTask stops tracking a task — called when it transitions to a
@@ -168,18 +178,86 @@ func (a *Argus) UntrackTask(id uuid.UUID) {
 	a.mu.Lock()
 	delete(a.pods, id)
 	a.mu.Unlock()
+	if a.persister == nil {
+		return
+	}
+	if err := a.persister.Delete(context.Background(), id); err != nil {
+		a.audit.Emit(audit.Event{
+			Category: "argus",
+			Outcome:  "persist-delete-failed",
+			Message:  err.Error(),
+			Fields:   map[string]string{"task_id": id.String()},
+		})
+	}
 }
 
 // Heartbeat is called when a sidecar reports it is alive. Unknown task IDs
 // are ignored.
 func (a *Argus) Heartbeat(id uuid.UUID) {
 	a.mu.Lock()
-	defer a.mu.Unlock()
 	st, ok := a.pods[id]
-	if !ok {
+	if ok {
+		st.LastHeartbeat = a.now()
+	}
+	a.mu.Unlock()
+	if ok {
+		a.persistOne(st)
+	}
+}
+
+// persistOne writes a single State to the persister (if configured),
+// emitting an audit event on failure but never returning an error —
+// in-memory state remains the source of truth for the rules engine, the
+// persister is best-effort durability.
+func (a *Argus) persistOne(st *State) {
+	if a.persister == nil || st == nil {
 		return
 	}
-	st.LastHeartbeat = a.now()
+	if err := a.persister.Save(context.Background(), st.TaskID, st); err != nil {
+		a.audit.Emit(audit.Event{
+			Category: "argus",
+			Outcome:  "persist-save-failed",
+			Message:  err.Error(),
+			Fields:   map[string]string{"task_id": st.TaskID.String()},
+		})
+	}
+}
+
+// rehydrate loads persisted state into the in-memory map. Called from
+// Start when a persister is configured. Skips entries whose pods no
+// longer exist in the dispatcher (orphans from a prior crash).
+func (a *Argus) rehydrate(ctx context.Context) {
+	if a.persister == nil {
+		return
+	}
+	states, err := a.persister.Load(ctx)
+	if err != nil {
+		a.audit.Emit(audit.Event{
+			Category: "argus",
+			Outcome:  "persist-load-failed",
+			Message:  err.Error(),
+		})
+		return
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	for _, st := range states {
+		// Drop tracked rows whose pods are gone (Minos crashed before it
+		// could persist the UntrackTask delete). Best-effort phase
+		// check — dispatcher errors fall through and we keep the row.
+		phase, err := a.dispatcher.PodPhase(ctx, st.Namespace, st.PodName)
+		if err == nil && (phase == dispatch.PhaseUnknown || phase.Terminal()) {
+			_ = a.persister.Delete(ctx, st.TaskID)
+			continue
+		}
+		clone := *st
+		a.pods[st.TaskID] = &clone
+	}
+	a.audit.Emit(audit.Event{
+		Category: "argus",
+		Outcome:  "rehydrated",
+		Fields:   map[string]string{"count": fmt.Sprintf("%d", len(a.pods))},
+	})
 }
 
 // Start begins the rules engine loop. Stop halts it.
@@ -191,9 +269,14 @@ func (a *Argus) Start(ctx context.Context) {
 	}
 	a.stopC = make(chan struct{})
 	a.done = make(chan struct{})
+	stopC := a.stopC
 	a.mu.Unlock()
 
-	go a.runLoop(ctx)
+	a.rehydrate(ctx)
+	// Pass stopC explicitly so runLoop's reference is stable for the
+	// goroutine's lifetime — Stop nils a.stopC before closing the channel
+	// and we don't want runLoop racing into a nil-channel select arm.
+	go a.runLoop(ctx, stopC)
 }
 
 // Stop halts the rules engine. Idempotent; safe if Start was never called.
@@ -210,7 +293,7 @@ func (a *Argus) Stop() {
 	<-done
 }
 
-func (a *Argus) runLoop(ctx context.Context) {
+func (a *Argus) runLoop(ctx context.Context, stopC <-chan struct{}) {
 	defer close(a.done)
 	ticker := time.NewTicker(a.cfg.PollInterval)
 	defer ticker.Stop()
@@ -218,7 +301,7 @@ func (a *Argus) runLoop(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
-		case <-a.stopC:
+		case <-stopC:
 			return
 		case <-ticker.C:
 			a.evaluate(ctx)
@@ -365,25 +448,37 @@ func (a *Argus) postThread(ctx context.Context, st *State, text string, kind her
 
 func (a *Argus) markWarned(id uuid.UUID) {
 	a.mu.Lock()
-	defer a.mu.Unlock()
-	if st, ok := a.pods[id]; ok {
+	st, ok := a.pods[id]
+	if ok {
 		st.Warned = true
+	}
+	a.mu.Unlock()
+	if ok {
+		a.persistOne(st)
 	}
 }
 
 func (a *Argus) markEscalated(id uuid.UUID) {
 	a.mu.Lock()
-	defer a.mu.Unlock()
-	if st, ok := a.pods[id]; ok {
+	st, ok := a.pods[id]
+	if ok {
 		st.Escalated = true
+	}
+	a.mu.Unlock()
+	if ok {
+		a.persistOne(st)
 	}
 }
 
 func (a *Argus) markTerminated(id uuid.UUID) {
 	a.mu.Lock()
-	defer a.mu.Unlock()
-	if st, ok := a.pods[id]; ok {
+	st, ok := a.pods[id]
+	if ok {
 		st.Terminated = true
+	}
+	a.mu.Unlock()
+	if ok {
+		a.persistOne(st)
 	}
 }
 

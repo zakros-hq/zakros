@@ -220,6 +220,70 @@ func TestArgusHibernatesOnPodSucceeded(t *testing.T) {
 	}
 }
 
+func TestArgusPersistsAndRehydrates(t *testing.T) {
+	cfg := argus.DefaultConfig()
+	cfg.StallThreshold = 0
+	rig := newRig(t, cfg)
+	persister := argus.NewMemPersister()
+	rig.a.WithPersister(persister)
+
+	task := insertTrackedTask(t, rig, 1000*time.Second)
+
+	// One heartbeat and one warn-trigger so persisted state has non-zero
+	// fields beyond the bare TrackTask snapshot.
+	rig.clock.advance(50 * time.Second)
+	rig.a.Heartbeat(task.ID)
+
+	// Persister should have one state recorded.
+	saved, err := persister.Load(context.Background())
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if len(saved) != 1 {
+		t.Fatalf("expected 1 persisted state, got %d", len(saved))
+	}
+	if saved[0].TaskID != task.ID {
+		t.Errorf("wrong task id persisted: %v", saved[0].TaskID)
+	}
+
+	// Spin up a fresh Argus pointed at the same persister + dispatcher,
+	// simulating a Minos restart. After Start() it should pick up the
+	// existing pod state without a fresh TrackTask call.
+	freshArgus, err := argus.New(cfg, rig.disp, rig.store, rig.hermes, audit.NewWriterEmitter("argus-restart", discardWriter{}))
+	if err != nil {
+		t.Fatalf("argus restart: %v", err)
+	}
+	freshArgus.WithPersister(persister)
+	freshCtx, freshCancel := context.WithCancel(context.Background())
+	defer freshCancel()
+	freshArgus.Start(freshCtx)
+	defer freshArgus.Stop()
+
+	// Heartbeat the rehydrated state — only succeeds if rehydration found
+	// the task in the persister load.
+	freshArgus.Heartbeat(task.ID)
+	saved, _ = persister.Load(context.Background())
+	if len(saved) != 1 {
+		t.Fatalf("expected 1 persisted state after rehydrate+heartbeat, got %d", len(saved))
+	}
+}
+
+func TestArgusUntrackDeletesPersistedState(t *testing.T) {
+	cfg := argus.DefaultConfig()
+	cfg.StallThreshold = 0
+	rig := newRig(t, cfg)
+	persister := argus.NewMemPersister()
+	rig.a.WithPersister(persister)
+
+	task := insertTrackedTask(t, rig, 1000*time.Second)
+	rig.a.UntrackTask(task.ID)
+
+	saved, _ := persister.Load(context.Background())
+	if len(saved) != 0 {
+		t.Errorf("expected persisted state cleared on untrack, got %d", len(saved))
+	}
+}
+
 func TestArgusMarksFailedOnPodFailed(t *testing.T) {
 	cfg := argus.DefaultConfig()
 	cfg.StallThreshold = 0

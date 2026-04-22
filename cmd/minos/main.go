@@ -84,6 +84,11 @@ func run(configPath, providerPath string, memMode, fakeDispatch bool, kubeconfig
 	if err != nil {
 		return fmt.Errorf("argus: %w", err)
 	}
+	if pool != nil {
+		a.WithPersister(argus.NewPGPersister(pool))
+	} else {
+		a.WithPersister(argus.NewMemPersister())
+	}
 
 	mnemosyne := openMnemosyne(pool, memMode)
 
