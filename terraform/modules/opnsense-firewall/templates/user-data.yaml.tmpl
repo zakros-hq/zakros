@@ -1,10 +1,10 @@
 #cloud-config
 # nuageinit (FreeBSD's in-tree cloud-init substitute) silently drops
 # `runcmd` — we can't rely on it to kick off opnsense-bootstrap. Instead
-# we write a self-deleting /etc/rc.local via write_files; FreeBSD always
-# runs rc.local at the end of boot if it exists, with no dependency on
-# runcmd support. nuageinit also won't mkdir -p parents for write_files,
-# so we stage config.xml in /tmp and rc.local moves it to /conf.
+# we write /etc/rc.local via write_files; FreeBSD always runs rc.local
+# at the end of boot if it exists, with no runcmd dependency. nuageinit
+# also won't mkdir -p parents for write_files, so we stage config.xml
+# in /tmp and rc.local moves it to /conf.
 hostname: ${hostname}
 
 users:
@@ -23,16 +23,37 @@ write_files:
     owner: root:wheel
     content: |
       #!/bin/sh
-      # Self-deleting one-shot: runs opnsense-bootstrap on first boot,
-      # then removes itself so it doesn't re-fire on future boots.
-      rm -f /etc/rc.local
-      set -eux
-      exec > /var/log/opnsense-bootstrap.log 2>&1
-      mkdir -p /conf
-      mv /tmp/opnsense-config.xml /conf/config.xml
-      chmod 0600 /conf/config.xml
-      fetch -o /tmp/opnsense-bootstrap.sh \
-        https://raw.githubusercontent.com/opnsense/update/master/src/bootstrap/opnsense-bootstrap.sh.in
-      # -f preserves /conf/config.xml (seeded above), -y answers prompts.
-      sh /tmp/opnsense-bootstrap.sh -r ${opnsense_release} -f -y
-      # opnsense-bootstrap reboots itself on success.
+      # Re-entrant bootstrap driver. FreeBSD cloud images sometimes pkg-
+      # update and reboot on first boot independently; if that races
+      # with opnsense-bootstrap we don't want to end up half-installed
+      # with no retry. So: don't self-delete, guard on whether OPNsense
+      # is already the userland, and be safe to run every boot.
+      set -eu
+
+      LOG=/var/log/opnsense-bootstrap.log
+      echo "rc.local fired at $(date)" >> "$LOG"
+
+      # If OPNsense is already installed, this FreeBSD rc.local is
+      # vestigial — quietly exit so we don't trample the running
+      # firewall on reboots (OPNsense won't actually honor /etc/rc.local
+      # but paranoia is cheap).
+      if [ -d /usr/local/opnsense ] || pkg info -e opnsense 2>/dev/null; then
+        echo "OPNsense already installed; rc.local no-op" >> "$LOG"
+        exit 0
+      fi
+
+      # Stage /conf/config.xml if we haven't already.
+      if [ ! -f /conf/config.xml ] && [ -f /tmp/opnsense-config.xml ]; then
+        mkdir -p /conf
+        mv /tmp/opnsense-config.xml /conf/config.xml
+        chmod 0600 /conf/config.xml
+      fi
+
+      # Fetch + run opnsense-bootstrap. -f preserves /conf/config.xml,
+      # -y answers prompts. Bootstrap reboots on success.
+      {
+        set -x
+        fetch -o /tmp/opnsense-bootstrap.sh \
+          https://raw.githubusercontent.com/opnsense/update/master/src/bootstrap/opnsense-bootstrap.sh.in
+        sh /tmp/opnsense-bootstrap.sh -r ${opnsense_release} -f -y
+      } >> "$LOG" 2>&1
