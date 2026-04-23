@@ -179,8 +179,8 @@ variable "opnsense_release" {
 
 variable "opnsense_freebsd_image_url" {
   type        = string
-  description = "FreeBSD 14 cloud-init image URL (uncompressed qcow2 — bpg/proxmox doesn't decompress xz)."
-  default     = "https://download.freebsd.org/releases/CloudImages/amd64/Latest/FreeBSD-14.2-RELEASE-amd64-BASIC-CLOUDINIT.qcow2"
+  description = "FreeBSD 14 BASIC-CLOUDINIT image URL (.qcow2.xz — the firewall module SSHes to the Proxmox node and unxz's it into the iso datastore)."
+  default     = "https://download.freebsd.org/releases/CloudImages/amd64/Latest/FreeBSD-14.2-RELEASE-amd64-BASIC-CLOUDINIT.qcow2.xz"
 }
 
 variable "opnsense_operator_ingress_cidr" {

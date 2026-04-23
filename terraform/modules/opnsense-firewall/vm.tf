@@ -25,41 +25,55 @@ data "local_file" "ssh_public_key" {
 
 # Hash the API secret with sha512-crypt ($6$), which is the format
 # OPNsense stores in config.xml. Uses the local openssl binary.
+# `query` is delivered as JSON on stdin — jq extracts it; the secret
+# never appears on the argv list, so `ps` can't see it.
 data "external" "api_secret_hash" {
   program = [
     "bash", "-c", <<-BASH
       set -euo pipefail
+      secret="$(jq -r .SECRET)"
       salt="$(head -c 12 /dev/urandom | base64 | tr -d '=+/')"
-      hash="$(openssl passwd -6 -salt "$salt" "$SECRET")"
+      hash="$(openssl passwd -6 -salt "$salt" "$secret")"
       printf '{"hash":"%s"}\n' "$hash"
     BASH
   ]
   query = {
-    # Passed via env so it doesn't show up in `ps`.
     SECRET = var.api_key_secret
   }
 }
 
-resource "proxmox_download_file" "freebsd_image" {
+# FreeBSD only publishes .qcow2.xz and bpg/proxmox's download_file
+# supports gz + zst but not xz. Instead of fighting that, we SSH to the
+# Proxmox node and curl+unxz directly into its iso datastore path. The
+# operator already has root SSH to the node (that's how the Proxmox
+# cluster is administered), so no new auth surface.
+resource "null_resource" "freebsd_image" {
   count = var.download_freebsd_image ? 1 : 0
 
-  content_type        = "iso"
-  datastore_id        = var.image_datastore
-  node_name           = var.proxmox_node
-  url                 = var.freebsd_image_url
-  file_name           = "freebsd-14.2-cloudinit.qcow2"
-  overwrite           = true
-  overwrite_unmanaged = true
-  verify              = true
-  upload_timeout      = 1200
-  # bpg/proxmox's download_file supports gz + zst decompression but not
-  # xz. Default image URL points at the uncompressed .qcow2; if the
-  # operator prefers the xz-compressed variant they decompress locally
-  # and set download_freebsd_image = false.
+  triggers = {
+    url          = var.freebsd_image_url
+    file_name    = local.freebsd_file_name
+    datastore_id = var.image_datastore
+  }
+
+  provisioner "local-exec" {
+    command = <<-EOT
+      ssh -o StrictHostKeyChecking=accept-new ${var.proxmox_ssh_user}@${var.proxmox_node} '
+        set -euo pipefail
+        dest="/var/lib/vz/template/iso/${local.freebsd_file_name}"
+        if [ -s "$dest" ]; then exit 0; fi
+        tmp="$(mktemp --suffix=.qcow2.xz)"
+        curl -fL -o "$tmp" "${var.freebsd_image_url}"
+        unxz -f "$tmp"
+        mv "$${tmp%.xz}" "$dest"
+      '
+    EOT
+  }
 }
 
 locals {
-  freebsd_file_id = var.download_freebsd_image ? proxmox_download_file.freebsd_image[0].id : "${var.image_datastore}:iso/freebsd-14.2-cloudinit.qcow2"
+  freebsd_file_name = "freebsd-14.2-cloudinit.qcow2"
+  freebsd_file_id   = "${var.image_datastore}:iso/${local.freebsd_file_name}"
 }
 
 resource "proxmox_virtual_environment_file" "user_data" {
@@ -162,4 +176,8 @@ resource "proxmox_virtual_environment_vm" "opnsense" {
       initialization[0].network_data_file_id,
     ]
   }
+
+  # local.freebsd_file_id is a static path, not a resource attribute,
+  # so Terraform can't infer this dependency from the reference alone.
+  depends_on = [null_resource.freebsd_image]
 }

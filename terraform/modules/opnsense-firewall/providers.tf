@@ -10,5 +10,11 @@ terraform {
       source  = "hashicorp/external"
       version = "~> 2.3"
     }
+    # null is used to SSH to the Proxmox node and curl+unxz the
+    # FreeBSD cloud image into the iso datastore.
+    null = {
+      source  = "hashicorp/null"
+      version = "~> 3.2"
+    }
   }
 }

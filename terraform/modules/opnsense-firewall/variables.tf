@@ -1,6 +1,12 @@
 variable "proxmox_node" { type = string }
 variable "primary_datastore" { type = string }
 
+variable "proxmox_ssh_user" {
+  type        = string
+  description = "SSH user on the Proxmox node, used by local-exec to curl+unxz the FreeBSD image into the iso datastore"
+  default     = "root"
+}
+
 variable "image_datastore" {
   type        = string
   description = "Storage pool for the FreeBSD cloud image download + cloud-init snippets"
@@ -11,13 +17,13 @@ variable "image_datastore" {
 
 variable "freebsd_image_url" {
   type        = string
-  description = "FreeBSD 14 cloud image (uncompressed qcow2). BASIC-CLOUDINIT variant has py-cloud-init preinstalled."
-  default     = "https://download.freebsd.org/releases/CloudImages/amd64/Latest/FreeBSD-14.2-RELEASE-amd64-BASIC-CLOUDINIT.qcow2"
+  description = "FreeBSD 14 BASIC-CLOUDINIT image URL (.qcow2.xz). A local-exec SSHes to the Proxmox node and runs curl | unxz to land the decompressed qcow2 in the iso datastore."
+  default     = "https://download.freebsd.org/releases/CloudImages/amd64/Latest/FreeBSD-14.2-RELEASE-amd64-BASIC-CLOUDINIT.qcow2.xz"
 }
 
 variable "download_freebsd_image" {
   type        = bool
-  description = "Have Terraform download the FreeBSD cloud image into Proxmox. Set to false if already uploaded."
+  description = "Have Terraform fetch + decompress the FreeBSD image on the Proxmox node via SSH. Set to false if already uploaded."
   default     = true
 }
 

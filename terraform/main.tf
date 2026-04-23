@@ -18,6 +18,7 @@ module "sdn" {
 module "firewall" {
   source                = "./modules/opnsense-firewall"
   proxmox_node          = var.proxmox_node
+  proxmox_ssh_user      = var.proxmox_ssh_user
   primary_datastore     = var.primary_datastore
   image_datastore       = var.image_datastore
   freebsd_image_url     = var.opnsense_freebsd_image_url
