@@ -62,14 +62,22 @@ variable "internal_bridge" {
 
 variable "sdn_zone" {
   type        = string
-  description = "Proxmox SDN VLAN zone name for Daedalus"
+  description = "Proxmox SDN VLAN zone name (Proxmox enforces ≤ 8 chars, lowercase)"
   default     = "daedalus"
+  validation {
+    condition     = length(var.sdn_zone) <= 8 && can(regex("^[a-z][a-z0-9]*$", var.sdn_zone))
+    error_message = "sdn_zone must be ≤ 8 lowercase alphanumeric chars."
+  }
 }
 
 variable "sdn_vnet" {
   type        = string
-  description = "Proxmox SDN VNet name — also the bridge name guests attach to"
-  default     = "daedavnet"
+  description = "Proxmox SDN VNet name — becomes the bridge name guests attach to (≤ 8 chars, lowercase)"
+  default     = "daedalan"
+  validation {
+    condition     = length(var.sdn_vnet) <= 8 && can(regex("^[a-z][a-z0-9]*$", var.sdn_vnet))
+    error_message = "sdn_vnet must be ≤ 8 lowercase alphanumeric chars."
+  }
 }
 
 variable "daedalus_vlan_id" {

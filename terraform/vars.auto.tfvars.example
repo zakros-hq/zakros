@@ -34,7 +34,7 @@ wan_bridge      = "vmbr0"
 internal_bridge = "vmbr1"
 
 sdn_zone         = "daedalus"
-sdn_vnet         = "daedavnet"
+sdn_vnet         = "daedalan"
 daedalus_vlan_id = 200
 daedalus_subnet  = "10.100.0.0/24"
 
