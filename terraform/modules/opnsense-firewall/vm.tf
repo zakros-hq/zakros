@@ -75,7 +75,7 @@ locals {
   # Proxmox's iso-storage volume parser only accepts .iso / .img extensions —
   # .qcow2 is rejected even though the file is fine internally. We land
   # the decompressed qcow2 under a .img name.
-  freebsd_file_name = "freebsd-15.0-cloudinit-ufs.img"
+  freebsd_file_name = "freebsd-14.3-cloudinit-ufs.img"
   freebsd_file_id   = "${var.image_datastore}:iso/${local.freebsd_file_name}"
   ssh_host          = var.proxmox_ssh_host != "" ? var.proxmox_ssh_host : var.proxmox_node
 }
