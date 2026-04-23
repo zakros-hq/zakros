@@ -34,13 +34,15 @@ image_datastore   = "local"
 #      VM.Config.Memory,VM.Config.Network,VM.Config.Options,VM.Console,\
 #      VM.GuestAgent.Audit,VM.Migrate,VM.PowerMgmt"
 #
-# 3. Download the Debian 12 LXC template (the Postgres container needs it):
+# 3. Download the Debian 12 LXC template (the Postgres container needs it).
+#    Proxmox bumps point releases often — check what's currently listed:
 #
 #      pveam update
-#      pveam download local debian-12-standard_12.7-1_amd64.tar.zst
+#      pveam available | grep debian-12-standard
+#      pveam download local debian-12-standard_12.12-1_amd64.tar.zst
 #
-#    If that version is gone, `pveam available | grep debian-12` shows
-#    the current one — update debian_lxc_template below to match.
+#    Then set debian_lxc_template below to the exact filename you
+#    downloaded (pveam list local to confirm).
 
 # SSH target for the Proxmox node — used by the firewall module to
 # curl+unxz the FreeBSD cloud image into the iso datastore (bpg/proxmox

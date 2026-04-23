@@ -159,8 +159,8 @@ variable "ubuntu_cloud_image_url" {
 
 variable "debian_lxc_template" {
   type        = string
-  description = "LXC template name (as Proxmox sees it) for the Postgres container"
-  default     = "debian-12-standard_12.7-1_amd64.tar.zst"
+  description = "LXC template name (as Proxmox sees it) for the Postgres container. Check `pveam available | grep debian-12-standard` and `pveam list local` for the version currently downloaded on your node."
+  default     = "debian-12-standard_12.12-1_amd64.tar.zst"
 }
 
 variable "debian_lxc_template_datastore" {
