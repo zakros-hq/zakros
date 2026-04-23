@@ -35,8 +35,8 @@ variable "download_freebsd_image" {
 
 variable "opnsense_release" {
   type        = string
-  description = "OPNsense release the bootstrap script installs, e.g. 24.7"
-  default     = "24.7"
+  description = "OPNsense release the bootstrap script installs, e.g. 26.1"
+  default     = "26.1"
 }
 
 # VM sizing.

@@ -180,7 +180,7 @@ variable "opnsense_vm_id" {
 variable "opnsense_release" {
   type        = string
   description = "OPNsense release opnsense-bootstrap installs"
-  default     = "24.7"
+  default     = "26.1"
 }
 
 variable "opnsense_freebsd_image_url" {

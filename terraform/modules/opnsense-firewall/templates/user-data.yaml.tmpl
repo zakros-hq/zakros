@@ -32,7 +32,7 @@ write_files:
       mv /tmp/opnsense-config.xml /conf/config.xml
       chmod 0600 /conf/config.xml
       fetch -o /tmp/opnsense-bootstrap.sh \
-        https://raw.githubusercontent.com/HardenedBSD/opnsense-update/refs/heads/master/opnsense-bootstrap.sh
+        https://raw.githubusercontent.com/opnsense/update/master/src/bootstrap/opnsense-bootstrap.sh.in
       # -f preserves /conf/config.xml (seeded above), -y answers prompts.
       sh /tmp/opnsense-bootstrap.sh -r ${opnsense_release} -f -y
       # opnsense-bootstrap reboots itself on success.
