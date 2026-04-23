@@ -1,7 +1,7 @@
 .PHONY: help all build test vet lint fmt tidy clean \
         dev-postgres dev-postgres-stop dev-k3d dev-k3d-stop \
         plugin-claude-code plugin-shellcheck sidecar-argus \
-        tf-fmt tf-validate tf-plan tf-apply tf-destroy tf-inventory
+        tf-fmt tf-validate tf-plan tf-apply tf-apply-firewall tf-destroy tf-inventory
 
 GO := go
 LINTER := golangci-lint
@@ -85,8 +85,11 @@ tf-validate: ## terraform init (no backend) + validate
 tf-plan: ## terraform plan (requires TF_VAR_proxmox_api_token etc. in env)
 	cd terraform && terraform plan
 
-tf-apply: ## terraform apply (requires credentials as above)
+tf-apply: ## terraform apply everything (run tf-apply-firewall first on a fresh build so OPNsense routes before guests boot)
 	cd terraform && terraform apply
+
+tf-apply-firewall: ## Phase 1 of a fresh apply — create SDN + OPNsense only, then wait for bootstrap before tf-apply
+	cd terraform && terraform apply -target=module.sdn -target=module.firewall
 
 tf-destroy: ## terraform destroy — tears down every Daedalus guest + SDN on Crete
 	cd terraform && terraform destroy

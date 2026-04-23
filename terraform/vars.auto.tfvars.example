@@ -34,6 +34,22 @@ image_datastore   = "local"
 #      VM.Config.Memory,VM.Config.Network,VM.Config.Options,VM.Console,\
 #      VM.GuestAgent.Audit,VM.Migrate,VM.PowerMgmt"
 #
+# --- Two-phase apply on a fresh build ---
+#
+# Ubuntu VMs' cloud-init runs apt on first boot; if OPNsense isn't
+# routing yet, apt fails and qemu-guest-agent never gets installed.
+# `make tf-apply` alone hits this race because Terraform considers the
+# firewall VM "created" the moment Proxmox accepts `qm create`, not
+# when OPNsense has finished bootstrap (~5-10 min: FreeBSD → nuageinit
+# → rc.local → opnsense-bootstrap → reboot → LAN up).
+#
+#   make tf-apply-firewall      # Phase 1: SDN + OPNsense only
+#   # wait until ping 10.100.0.1 from another VM on daedalan works
+#   make tf-apply               # Phase 2: the rest
+#
+# Subsequent applies (no firewall rebuild) can run `make tf-apply`
+# directly — the ordering only matters on cold start.
+
 # 3. Download the Debian 12 LXC template (the Postgres container needs it).
 #    Proxmox bumps point releases often — check what's currently listed:
 #
