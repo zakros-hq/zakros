@@ -18,6 +18,17 @@ write_files:
     owner: root:wheel
     content: |
       ${indent(6, config_xml)}
+  # FreeBSD cloud image defaults ifconfig_DEFAULT to SYNCDHCP, which
+  # blocks boot trying DHCP on every NIC. vtnet1 is the LAN side of the
+  # Daedalus SDN VNet with no DHCP server — the attempt would time out
+  # and add minutes to each boot. Mark it NOAUTO so FreeBSD skips it;
+  # OPNsense's config.xml brings it up with the static LAN IP post-
+  # bootstrap.
+  - path: /etc/rc.conf.d/daedalus-netif
+    permissions: "0644"
+    owner: root:wheel
+    content: |
+      ifconfig_vtnet1="NOAUTO"
   - path: /etc/rc.local
     permissions: "0755"
     owner: root:wheel
