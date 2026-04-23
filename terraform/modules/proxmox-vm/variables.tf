@@ -4,17 +4,18 @@ variable "image_datastore" { type = string }
 variable "create_cloud_image" { type = bool }
 variable "cloud_image_url" { type = string }
 
-# Network — one NIC per guest on the Daedalus SDN VNet. Bridge name is
-# the SDN VNet id (Proxmox exposes VNets as bridges after sdn apply).
+# Network — one NIC per guest on the parent bridge. Flat VLAN topology:
+# guests DHCP on vmbr0 tagged with vlan_id; homelab router handles
+# routing/NAT.
 variable "bridge" {
   type        = string
-  description = "Bridge (SDN VNet id) each guest attaches to"
+  description = "Proxmox bridge each guest attaches to"
 }
-variable "subnet" {
-  type        = string
-  description = "CIDR for the Daedalus network (gateway = first host)"
+variable "vlan_id" {
+  type        = number
+  description = "VLAN tag applied to each guest NIC; null for untagged"
+  default     = null
 }
-variable "dns_servers" { type = list(string) }
 variable "domain_suffix" { type = string }
 
 variable "admin_username" { type = string }

@@ -56,8 +56,18 @@ variable "image_datastore" {
 
 variable "wan_bridge" {
   type        = string
-  description = "Existing Proxmox bridge with a physical uplink; OPNsense WAN attaches here for DHCP from the wider network"
+  description = "Proxmox bridge each guest attaches to (VLAN-aware, with physical uplink). Flat topology: guests DHCP on this bridge + VLAN tag; homelab router handles routing."
   default     = "vmbr0"
+}
+
+variable "guest_vlan_id" {
+  type        = number
+  description = "VLAN tag applied to every Daedalus guest NIC. Must exist on the upstream homelab switch."
+  default     = 140
+  validation {
+    condition     = var.guest_vlan_id >= 2 && var.guest_vlan_id <= 4094
+    error_message = "VLAN id must be between 2 and 4094."
+  }
 }
 
 variable "internal_bridge" {

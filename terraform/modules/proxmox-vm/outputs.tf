@@ -4,7 +4,7 @@ output "guests" {
     for name, cfg in var.vm_configurations : name => {
       kind  = "vm"
       vm_id = cfg.vm_id
-      ip    = local.vm_ip[name]
+      mac   = local.vm_mac[name]
       fqdn  = "${name}.${var.domain_suffix}"
     }
   }

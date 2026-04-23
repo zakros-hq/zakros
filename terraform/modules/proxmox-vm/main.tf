@@ -20,14 +20,7 @@ resource "proxmox_download_file" "cloud_image" {
 locals {
   cloud_image_file_id = var.create_cloud_image ? proxmox_download_file.cloud_image[0].id : "${var.image_datastore}:iso/noble-server-cloudimg-amd64.img"
 
-  subnet_prefix = tonumber(split("/", var.subnet)[1])
-  subnet_host   = cidrhost(var.subnet, 1) # OPNsense LAN gateway address
-
-  # Per-VM IP (static) + MAC (stable across regenerations).
-  vm_ip = {
-    for name, cfg in var.vm_configurations :
-    name => cidrhost(var.subnet, cfg.ip_offset)
-  }
+  # Stable MAC per VM — avoids DHCP lease drift across recreates.
   vm_mac = {
     for name, cfg in var.vm_configurations :
     name => format("52:54:00:%02x:%02x:%02x",
@@ -67,13 +60,28 @@ resource "proxmox_virtual_environment_file" "network_data" {
 
   source_raw {
     data = templatefile("${path.module}/templates/network-data.yaml.tmpl", {
-      address     = local.vm_ip[each.key]
-      prefix      = local.subnet_prefix
-      gateway     = local.subnet_host
-      macaddress  = local.vm_mac[each.key]
-      dns_servers = var.dns_servers
+      macaddress = local.vm_mac[each.key]
     })
     file_name = "${each.key}-network-data.yaml"
+  }
+}
+
+# Explicit meta-data so cloud-init sees a unique instance-id per VM.
+# Without this, the Ubuntu cloud image's baked-in cloud-init state
+# (semaphores from the image-build run) makes cloud-init skip modules
+# with "config-<module> already ran (freq=once-per-instance)" — including
+# package_update_upgrade_install, which is why qemu-guest-agent and
+# other packages never get installed.
+resource "proxmox_virtual_environment_file" "meta_data" {
+  for_each = var.vm_configurations
+
+  content_type = "snippets"
+  datastore_id = var.image_datastore
+  node_name    = var.proxmox_node
+
+  source_raw {
+    data      = "instance-id: daedalus-${each.key}-${each.value.vm_id}\nlocal-hostname: ${each.key}\n"
+    file_name = "${each.key}-meta-data.yaml"
   }
 }
 
@@ -113,11 +121,13 @@ resource "proxmox_virtual_environment_vm" "daedalus" {
     datastore_id         = var.primary_datastore
     user_data_file_id    = proxmox_virtual_environment_file.user_data[each.key].id
     network_data_file_id = proxmox_virtual_environment_file.network_data[each.key].id
+    meta_data_file_id    = proxmox_virtual_environment_file.meta_data[each.key].id
   }
 
   network_device {
     bridge      = var.bridge
     mac_address = local.vm_mac[each.key]
+    vlan_id     = var.vlan_id
   }
 
   # Cloud-init files are rendered once at first boot; ignore subsequent

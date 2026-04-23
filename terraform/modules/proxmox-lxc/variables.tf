@@ -12,11 +12,12 @@ variable "template_datastore" {
 
 variable "bridge" {
   type        = string
-  description = "Bridge (SDN VNet id) each LXC attaches to"
+  description = "Proxmox bridge each LXC attaches to"
 }
-variable "subnet" {
-  type        = string
-  description = "CIDR for the Daedalus network (gateway = first host)"
+variable "vlan_id" {
+  type        = number
+  description = "VLAN tag applied to each LXC NIC; null for untagged"
+  default     = null
 }
 variable "dns_servers" { type = list(string) }
 variable "domain_suffix" { type = string }

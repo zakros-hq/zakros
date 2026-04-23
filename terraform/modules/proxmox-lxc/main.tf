@@ -2,20 +2,6 @@ data "local_file" "ssh_public_key" {
   filename = pathexpand(var.ssh_public_key_path)
 }
 
-locals {
-  subnet_prefix = tonumber(split("/", var.subnet)[1])
-  gateway       = cidrhost(var.subnet, 1)
-
-  lxc_ip = {
-    for name, cfg in var.lxc_configurations :
-    name => cidrhost(var.subnet, cfg.ip_offset)
-  }
-  lxc_ip_cidr = {
-    for name, cfg in var.lxc_configurations :
-    name => format("%s/%d", cidrhost(var.subnet, cfg.ip_offset), local.subnet_prefix)
-  }
-}
-
 resource "proxmox_virtual_environment_container" "daedalus" {
   for_each = var.lxc_configurations
 
@@ -62,18 +48,17 @@ resource "proxmox_virtual_environment_container" "daedalus" {
       keys = [trimspace(data.local_file.ssh_public_key.content)]
     }
 
-    # Single interface: static IP on the Daedalus VNet, gateway = OPNsense LAN.
     ip_config {
       ipv4 {
-        address = local.lxc_ip_cidr[each.key]
-        gateway = local.gateway
+        address = "dhcp"
       }
     }
   }
 
   network_interface {
-    name   = "eth0"
-    bridge = var.bridge
+    name    = "eth0"
+    bridge  = var.bridge
+    vlan_id = var.vlan_id
   }
 
   startup {

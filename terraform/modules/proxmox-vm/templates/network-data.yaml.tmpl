@@ -4,12 +4,4 @@ ethernets:
     match:
       macaddress: '${macaddress}'
     set-name: eth0
-    dhcp4: false
-    addresses:
-      - ${address}/${prefix}
-    gateway4: ${gateway}
-    nameservers:
-      addresses:
-%{ for dns in dns_servers ~}
-        - ${dns}
-%{ endfor ~}
+    dhcp4: true
