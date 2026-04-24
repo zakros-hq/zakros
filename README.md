@@ -59,6 +59,17 @@ Named for the Minotaur myth — Minos commissioned Daedalus to build the labyrin
 
 Worker pods ship a [`claude-code`](agents/claude-code) image. The AI inference itself is Anthropic's Claude, authenticated via OAuth against the operator's subscription rather than a metered API key.
 
+## Hardware
+
+Daedalus runs on two physical hosts in this homelab. The architecture is not bound to these specific devices — see [`docs/environment.md`](docs/environment.md) for the contract each host must satisfy.
+
+| Host       | Role                                  | Specs |
+| ---------- | ------------------------------------- | ----- |
+| **Crete**  | Hypervisor for Daedalus VMs + LXC     | Minisforum MS-01 · Intel i9-13900H · 96 GB DDR5 · 2× 1 TB NVMe (ZFS mirror) + third M.2 reserved · 2× 2.5 GbE + 2× 10 GbE · Proxmox VE 9.x |
+| **Athena** | Local inference oracle (Phase 3 role) | Mac Studio M4 Max (Z1CD9LL/A) · 40-core GPU · 48 GB unified memory · 1 TB internal · macOS / launchd |
+
+Athena is planned to grow into an M5 Ultra Mac Studio cluster interconnected over Thunderbolt 5 with RDMA (macOS 26.2+) to scale inference capacity without changing its architectural contract.
+
 ## Current state — Phase 1 (MVP)
 
 **Phase 1 is complete and verified end-to-end on a real Proxmox cluster.** Posture: **single operator, single project, single surface (Discord), single private repo with trusted contributors.** Everything beyond that is Phase 2+.
