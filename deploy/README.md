@@ -7,6 +7,52 @@ after fixing config or adjusting env.
 Assumes the flat-VLAN topology (VLAN 140, 172.16.140.0/24, DHCP). Current
 IPs: postgres .100, minos .101, labyrinth .102, ariadne .103.
 
+## Teardown and rebuild from scratch
+
+**What persists** across a teardown/rebuild — do not delete:
+
+- Cloudflare Tunnel registration + hostname route (reuse the same token)
+- GitHub App registration + webhook secret + installed repos
+- Discord App + bot token
+- Claude Code OAuth token from `claude setup-token`
+- Proxmox host config: bridges, storage pools, the `terraform@crete`
+  token, libguestfs-tools, `snippets`/`vztmpl`/`iso` content-type flags
+  on local datastore, Debian LXC template
+- `deploy/config.json` and `deploy/secrets.json` (gitignored; values
+  still valid after rebuild)
+
+**What gets destroyed**:
+
+```sh
+make tf-destroy
+```
+
+Tears down the 4 guests + Proxmox files (cloud-init snippets, per-VM
+downloads). Proxmox state snapshots cleanly — a fresh `tf-apply` will
+re-download the Ubuntu cloud image and recreate everything.
+
+Optional Crete cleanup if you want a truly cold start (otherwise these
+cache across rebuilds and speed up the next apply):
+
+```sh
+ssh root@172.16.30.103 "rm -f /var/lib/vz/template/iso/noble-server-cloudimg-amd64.img"
+```
+
+**Fresh bring-up** from a clean destroy:
+
+1. `make tf-apply` — provisions guests.
+2. Check the homelab router's DHCP lease table to confirm IPs. MAC
+   addresses are deterministic from `vm_id` + `ip_offset`, so if the
+   router does MAC-based reservations, IPs stay at
+   `.100 / .101 / .102 / .103`. If not, update the addresses in
+   `deploy/config.json` (database_url, minos_pod_url) to match.
+3. Run **sections 1–8 below in order** using your existing
+   `deploy/secrets.json` + `deploy/config.json`. Each script is
+   idempotent, so if any step fails mid-run you re-run it after the fix.
+
+Expected total time for a cold rebuild: ~20 minutes (mostly Postgres +
+apt-upgrade waits; nothing interactive).
+
 ## 1. Postgres LXC (vmid 211)
 
 ```sh
