@@ -151,19 +151,25 @@ Questions not blocking code work; answers needed before H1/H2/J acceptance check
 
 **Proves:** Phase 1 acceptance bullet 2 ("Iris answers 'what's running?' and 'start a task for X' on the same surface") actually holds.
 
-**Scope:** `phase-1-plan.md §8 Slice E` verbatim. Iris as a long-running pod on Labyrinth backed by Ollama on Athena, Minos state API, `@iris` intake, NL-to-commission translation. This is a finish-what-was-started slice, not a Phase 2 structural slice.
+**Scope:** `phase-1-plan.md §8 Slice E` shape — Iris as a long-running pod on Labyrinth with Minos state API, `@iris` intake, NL-to-commission translation. This is a finish-what-was-started slice, not a Phase 2 structural slice.
+
+**Backend deviation from `architecture.md §10`:** the architecture doc describes Iris's backend as Ollama-hosted on Athena. **Athena is not yet stood up** (it's described in `architecture.md §5` as a pre-existing homelab asset, but the operator has not yet deployed it). For Slice 0, Iris is Claude-backed via the same direct-Anthropic injection pattern Phase 1 `claude-code` pods use — operator's Anthropic credential resolved by Minos, injected into the Iris pod's environment at spawn. The Phase 1 acceptance bullet is functional ("Iris answers...") and doesn't specify backend, so Slice 0 on Claude still closes the gate.
+
+Two downstream migrations follow from this interim backend pick — both are small pod-spec config changes, not code work:
+- **When Slice H2 lands (Apollo):** Iris's Anthropic traffic routes through Apollo instead of direct. Iris gains `apollo.anthropic.claude-*` scope on its JWT; credential drops from the pod environment.
+- **When Athena is stood up (Phase 3 per current roadmap):** Iris flips from Claude to local Ollama per the original architecture commitment. Pod spec swaps the `anthropic_endpoint` for the Athena Ollama URL.
 
 ### Tasks
 
-1. **Athena Ollama reachability.** Iris pod's egress allowlist includes Athena's Ollama port (11434). Model chosen, pulled to Athena, name configured for Iris.
+1. **Iris pod image.** Long-running pod spec with `daedalus.project/pod-class: iris` label. Backend: Anthropic API client (same credential injection pattern as Phase 1 `claude-code` pods). Conversation state persisted to Postgres `iris.conversations` schema.
 
-2. **Iris pod image.** Long-running pod spec with `daedalus.project/pod-class: iris` label. Backend: Ollama HTTP client, conversation state persisted to Postgres `iris.conversations` schema.
+2. **Minos state API.** `GET /state/tasks`, `GET /state/queue`, `GET /state/recent`. Bearer-token auth (Phase 1 posture; swaps to JWT in Slice F).
 
-3. **Minos state API.** `GET /state/tasks`, `GET /state/queue`, `GET /state/recent`. Bearer-token auth (Phase 1 posture; swaps to JWT in Slice F).
+3. **Iris capabilities.** `mnemosyne.memory.lookup`, `hermes.events.next`, `hermes.post_as_iris`. Admin-only intake check (hardcoded admin config; swaps to identity registry in Slice G).
 
-4. **Iris capabilities.** `mnemosyne.memory.lookup`, `hermes.events.next`, `hermes.post_as_iris`. Admin-only intake check (hardcoded admin config; swaps to identity registry in Slice G).
+4. **Command intake.** `@iris` mention or `/iris` slash command. Two intents for Phase 1 close: state query and commission.
 
-5. **Command intake.** `@iris` mention or `/iris` slash command. Two intents for Phase 1 close: state query and commission.
+5. **Egress allowlist.** Iris pod's Proxmox-firewall allowlist extends to cover Anthropic CDN ranges (mirrors Phase 1 `claude-code` pod allowlist). Collapses to "Apollo internal only" when H2 lands.
 
 ### Acceptance checkpoint for Slice 0
 
@@ -171,7 +177,7 @@ Questions not blocking code work; answers needed before H1/H2/J acceptance check
 - Operator asks Iris "start a task to fix bug 456" → Iris confirms, commissions, Slice A–D pipeline executes
 - Iris conversation state persists across Iris pod replacement
 
-Phase 1 acceptance is now fully closed.
+Phase 1 acceptance is now fully closed, with the backend-is-Claude interim explicitly documented.
 
 ---
 
@@ -431,11 +437,12 @@ Phase 1 acceptance is now fully closed.
    - Enforces at the Apollo layer, before the Anthropic workspace spend cap
    - Per-project counters in Postgres `apollo` schema, rolling windows
 
-5. **Claude Code pod migration.**
+5. **Anthropic-backed pod migration.**
    - Worker backend plugin config grows an `anthropic_endpoint` field; defaults to Apollo's internal URL
    - Claude Code plugin routes its Anthropic traffic through Apollo instead of the Anthropic API directly
-   - Pod's credential set collapses: no more per-pod Anthropic credential; only a pod JWT with `apollo.anthropic.claude-*` scopes
-   - Pod's egress allowlist collapses from Anthropic CDN ranges to Apollo's internal IP only
+   - **Iris pod also migrates here** — the Slice 0 direct-Anthropic interim flips to Apollo-routed. Iris gains `apollo.anthropic.claude-*` scope on its JWT; Anthropic credential drops from Iris pod env
+   - Both pod classes' credential sets collapse: no more per-pod Anthropic credential; only a pod JWT with `apollo.anthropic.claude-*` scopes
+   - Both pods' egress allowlists collapse from Anthropic CDN ranges to Apollo's internal IP only
 
 6. **Second-provider structural readiness.**
    - Provider plugin interface shaped for OpenAI/Google/etc. plugins to land without core changes
@@ -443,7 +450,7 @@ Phase 1 acceptance is now fully closed.
 
 ### Acceptance checkpoint for Slice H2
 
-- A commissioned task routes all Anthropic traffic through Apollo; no pod has direct Anthropic CDN egress
+- A commissioned task routes all Anthropic traffic through Apollo; no pod (Daedalus workers or Iris) has direct Anthropic CDN egress
 - A runaway-loop test pod is terminated by Argus on per-project token-cap breach *before* the Anthropic workspace spend cap trips (closes `security.md §13`)
 - A synthetic second-provider plugin (OpenAI stub) loads into Apollo, accepts a JWT with `apollo.openai.gpt-*` scope, and the test pod commissions through it successfully
 - Anthropic API key no longer appears in any pod's environment; a compromised pod cannot exfiltrate provider credentials

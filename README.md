@@ -91,7 +91,7 @@ The [full roadmap](docs/roadmap.md) is the authoritative source; this is the sha
 
 Planned. Full slice decomposition in [`docs/phase-2-plan.md`](docs/phase-2-plan.md); the shape at a glance:
 
-- **Slice 0** — close the Phase 1 Iris acceptance bullet (Iris-as-pod on Ollama, NL commission + state query)
+- **Slice 0** — close the Phase 1 Iris acceptance bullet (Iris-as-pod, NL commission + state query; Claude-backed interim until Athena is stood up)
 - **Slices F ‖ G** — Ed25519 JWT foundation + github-mcp-server shim (F), identity registry + project registry + shared plugin supervisor (G). Replaces HMAC bearers, `AdminIdentity` scalar, `ProjectConfig` singleton, and the lingering GitHub PAT
 - **Slice J** — extract Argus into its own service with JWT-verified push-event ingest; add Cerberus verifier plugins (GitHub HMAC + Slack signing, library stays in-process)
 - **Slices H1 ‖ H2 ‖ I** — Hecate credentials broker on OpenBao (H1), Apollo external-LLM broker with non-forgeable usage tracking (H2), Hermes subprocess extraction + multi-identity (webhook-based per-message `username`/avatar override) + Slack plugin (I)
