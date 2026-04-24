@@ -79,17 +79,39 @@ The script builds `bin/minos`, scps it + config + secrets + kubeconfig,
 writes the systemd unit, starts the service. Idempotent — re-run to push
 config changes.
 
-## 5. GitHub webhook ingress
+## 5. Public ingress via Cloudflare Tunnel
 
-Still pending. Options:
-- FRP tunnel from minos VM out to a public endpoint
-- Cloudflare Tunnel (no port-forward, authenticated ingress)
-- ngrok (dev only)
+Makes `POST https://<your-hostname>/webhooks/github` reach the minos
+daemon without port-forwarding or public IPs.
 
-Target: `POST <public-hostname>/cerberus/webhook` reaches the minos daemon
-on 172.16.140.101:8080.
+One-time in the Cloudflare Zero Trust dashboard:
+1. Networks → Tunnels → **Create a tunnel** (Cloudflared flavor), name
+   it `daedalus`, copy the token on the "Install and run a connector"
+   screen.
+2. **Public Hostname** tab → Add public hostname → pick a subdomain on
+   a domain you control, service type `HTTP`, URL `localhost:8080`.
 
-## 6. End-to-end smoke test
+Then from the operator workstation:
+
+```sh
+CLOUDFLARED_TOKEN='<the long token>' deploy/cloudflared-install.sh
+
+# verify
+curl -v https://<your-hostname>/healthz
+```
+
+## 6. GitHub App (Cerberus webhooks)
+
+See [github-app.md](./github-app.md) for the full registration walkthrough.
+TL;DR:
+
+1. Generate webhook secret: `openssl rand -base64 32 | tr -d '=+/' | head -c 40`
+2. Register GitHub App pointing at `https://<your-hostname>/webhooks/github`
+3. Install on a test repo
+4. Paste the webhook secret into `deploy/secrets.json` under
+   `cerberus/github-webhook`, re-run `deploy/minos-install.sh`
+
+## 7. End-to-end smoke test
 
 1. `/status` in Discord → minos should respond with operational summary
 2. `/commission "echo hello"` → pod spawns on labyrinth, runs entrypoint,
