@@ -30,6 +30,7 @@ func newTestServerWithMnemosyne(t *testing.T) (kit testServerKit, mnemo *mnemome
 	prov := &staticProvider{refs: map[string][]byte{
 		"minos-bearer-secret":   bearerSecret,
 		"minos-admin-token":     []byte("admin-token"),
+		"minos-iris-token":      []byte("iris-token"),
 		"github-app-token":      []byte("ghs_injected"),
 		"github-webhook-secret": webhookSecret,
 	}}
@@ -37,6 +38,7 @@ func newTestServerWithMnemosyne(t *testing.T) (kit testServerKit, mnemo *mnemome
 		ListenAddr:             ":0",
 		BearerSecretRef:        "minos-bearer-secret",
 		AdminTokenRef:          "minos-admin-token",
+		IrisTokenRef:           "minos-iris-token",
 		GithubWebhookSecretRef: "github-webhook-secret",
 		Admin:                  core.AdminIdentity{Surface: "discord", SurfaceID: "admin-id"},
 		Project: core.ProjectConfig{

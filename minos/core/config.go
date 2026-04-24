@@ -18,6 +18,13 @@ type Config struct {
 	DatabaseURL            string        `json:"database_url"`
 	BearerSecretRef        string        `json:"bearer_secret_ref"`
 	AdminTokenRef          string        `json:"admin_token_ref"`
+	// IrisTokenRef is the secret-provider reference whose value gates the
+	// Minos state API (`/state/*`) and Hermes pull endpoints
+	// (`/hermes/events.next`, `/hermes/post_as_iris`). The Iris pod holds
+	// this token and presents it as a bearer. Optional: when empty, the
+	// Iris-facing routes return 503 — useful for deployments that haven't
+	// installed the Iris pod yet.
+	IrisTokenRef           string        `json:"iris_token_ref"`
 	GithubWebhookSecretRef string        `json:"github_webhook_secret_ref"`
 	// MinosPodURL is the Minos API URL as seen from inside a Labyrinth
 	// pod. Injected into the pod as DAEDALUS_MINOS_URL so the entrypoint
@@ -72,6 +79,11 @@ type ProjectConfig struct {
 	AgentMentionHandle string `json:"agent_mention_handle"`
 	DefaultWorkspaceSize envelope.WorkspaceSize `json:"default_workspace_size"`
 	DefaultBaseBranch    string                 `json:"default_base_branch"`
+	// DefaultRepoURL is the project's primary repo. Used as the
+	// fallback when an Iris commission omits repo_url; for the worker
+	// pod path the envelope still carries an explicit repo_url per
+	// commission. Phase 3 multi-project registry replaces this.
+	DefaultRepoURL string `json:"default_repo_url"`
 	// ArgusSidecarImage, when non-empty, adds the Argus heartbeat sidecar
 	// container to every dispatched pod.
 	ArgusSidecarImage string          `json:"argus_sidecar_image"`

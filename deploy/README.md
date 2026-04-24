@@ -106,9 +106,10 @@ Things to replace in `config.json`:
 - `REPLACE_POSTGRES_PASSWORD` → the password you generated in step 1
 - `REPLACE_YOUR_DISCORD_USER_ID` → your Discord user ID (enable Developer Mode, right-click yourself, Copy User ID)
 - `REPLACE_DISCORD_CHANNEL_ID` → the Discord channel where Minos creates task threads
+- `REPLACE_DEFAULT_REPO_URL` → the project's primary GitHub repo URL (used by Iris when commissioning without an explicit repo)
 
 Things to replace in `secrets.json`:
-- `minos/bearer` and `minos/admin-token` — `openssl rand -base64 32` each
+- `minos/bearer`, `minos/admin-token`, `minos/iris-token` — `openssl rand -base64 32` each
 - `cerberus/github-webhook` — any strong random string; configure the same value in the GitHub App webhook secret field
 - `hermes/discord-bot-token` — your Discord bot token
 
@@ -193,10 +194,43 @@ Both wire through `project.capabilities.injected_credentials` in
 that claude-code + gh read automatically. Re-run
 `deploy/minos-install.sh` after editing.
 
-## 8. End-to-end smoke test
+## 8. Iris conversational pod
+
+Iris is a long-running pod in labyrinth that long-polls Hermes for
+`@iris` / `/iris` messages, asks Claude what to do, and either answers
+state queries (`what's running?`) or commissions tasks. Phase 1 / Slice
+0 backs it with the Anthropic Messages API directly using the same
+OAuth token the worker pod uses; Phase 2 routes through Apollo, Phase 3
+swaps backend to Athena Ollama.
+
+Apply the Deployment after the worker images are loaded (step 3) and
+Minos is running (step 4):
+
+```sh
+deploy/iris-install.sh
+
+# tail logs
+KUBECONFIG=~/.kube/daedalus.yaml kubectl -n daedalus logs -f deploy/iris
+```
+
+The script reads `deploy/config.json` + `deploy/secrets.json`, renders
+`deploy/templates/iris-deployment.yaml`, applies it. Iris uses:
+
+- `minos/iris-token` for `/state/*`, `/hermes/events.next`,
+  `/hermes/post_as_iris`, `/memory/lookup`
+- `minos/admin-token` for `POST /tasks` (Iris commissions on the
+  operator's behalf — Phase 2 Slice G replaces this with proper
+  user-on-behalf-of identity forwarding)
+- `claude-code/oauth-token` (or a separate `anthropic/api-key` if
+  configured) for Claude calls
+
+## 9. End-to-end smoke test
 
 1. `/status` in Discord → minos should respond with operational summary
-2. `/commission "echo hello"` → pod spawns on labyrinth, runs entrypoint,
-   opens PR on the test repo, audit row lands in postgres
-3. `minosctl replay <run-id>` from operator workstation → prints the full
-   task trace
+2. `/commission repo=… branch=… "echo hello"` → pod spawns on labyrinth,
+   runs entrypoint, opens PR on the test repo, audit row lands in postgres
+3. `@iris what's running` in Discord → Iris replies with the active
+   task list pulled from `/state/tasks`
+4. `@iris commission a task to add a TODO to README.md` → Iris confirms
+   and commissions; the worker pod runs the same Slice A–D pipeline as
+   the manual `/commission` path

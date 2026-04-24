@@ -111,6 +111,15 @@ func New(cfg Config, p provider.Provider, store storage.Store, d dispatch.Dispat
 	}
 	if s.hermes != nil {
 		s.hermes.Subscribe(s.handleInbound)
+		// Wire the Iris pull consumer when Iris is configured. Without
+		// this registration, /hermes/events.next 503s — operators who
+		// haven't installed Iris just don't set IrisTokenRef and the
+		// Iris-facing routes refuse on the auth check first anyway.
+		if s.cfg.IrisTokenRef != "" {
+			if err := s.hermes.RegisterPullConsumer(IrisPullConsumer, irisPullCapacity, IrisPullFilter); err != nil {
+				return nil, fmt.Errorf("minos/core: register iris pull consumer: %w", err)
+			}
+		}
 	}
 	return s, nil
 }

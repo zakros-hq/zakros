@@ -31,6 +31,23 @@ func (s *Server) routes() http.Handler {
 	mux.Handle("POST /tasks/{id}/heartbeat", s.requirePodAuth(http.HandlerFunc(s.handleHeartbeat)))
 	mux.Handle("POST /tasks/{id}/memory", s.requirePodAuth(http.HandlerFunc(s.handleReportMemory)))
 	mux.Handle("POST /tasks/{id}/post", s.requirePodAuth(http.HandlerFunc(s.handleReportPost)))
+	// State API — read-only, gated by the Iris bearer. Iris (and any
+	// future read-only consumer) uses this surface to answer "what's
+	// running?"-style questions. Phase 2 Slice F replaces the bearer
+	// check with a JWT carrying the `minos.query_state` scope.
+	mux.Handle("GET /state/tasks", s.requireIrisAuth(http.HandlerFunc(s.handleStateTasks)))
+	mux.Handle("GET /state/queue", s.requireIrisAuth(http.HandlerFunc(s.handleStateQueue)))
+	mux.Handle("GET /state/recent", s.requireIrisAuth(http.HandlerFunc(s.handleStateRecent)))
+	// Hermes pull endpoints — Iris's read/write surface to the
+	// communication broker without needing a direct Plugin reference.
+	// Phase 2 Slice F replaces the bearer with a JWT carrying
+	// `hermes.events.next` and `hermes.post_as_iris` scopes.
+	mux.Handle("GET /hermes/events.next", s.requireIrisAuth(http.HandlerFunc(s.handleHermesEventsNext)))
+	mux.Handle("POST /hermes/post_as_iris", s.requireIrisAuth(http.HandlerFunc(s.handleHermesPostAsIris)))
+	// Mnemosyne lookup — Phase 1 posture wraps the in-process Store. Phase
+	// 2 Slice F replaces the bearer with a JWT carrying
+	// `mnemosyne.memory.lookup` scope; pgvector semantic query lands then.
+	mux.Handle("POST /memory/lookup", s.requireIrisAuth(http.HandlerFunc(s.handleMemoryLookup)))
 	mux.HandleFunc("POST /webhooks/github", s.handleGithubWebhook)
 	return s.auditMiddleware(mux)
 }

@@ -4,6 +4,7 @@
 
   "bearer_secret_ref": "minos/bearer",
   "admin_token_ref": "minos/admin-token",
+  "iris_token_ref": "minos/iris-token",
   "github_webhook_secret_ref": "cerberus/github-webhook",
 
   "minos_pod_url": "http://172.16.140.101:8080",
@@ -21,6 +22,7 @@
     "agent_mention_handle": "",
     "default_workspace_size": "small",
     "default_base_branch": "main",
+    "default_repo_url": "REPLACE_DEFAULT_REPO_URL",
     "default_budget": {
       "wall_clock_seconds": 1800,
       "max_tool_calls": 200

@@ -84,9 +84,10 @@ type Plugin interface {
 
 // Broker is the Hermes core. It is safe for concurrent use.
 type Broker struct {
-	mu       sync.RWMutex
-	plugins  map[string]Plugin
-	handlers []InboundHandler
+	mu             sync.RWMutex
+	plugins        map[string]Plugin
+	handlers       []InboundHandler
+	pullConsumers  map[string]*pullConsumer
 }
 
 // New returns an empty Broker ready to accept plugin registrations.
@@ -185,7 +186,9 @@ func (b *Broker) plugin(surface string) (Plugin, error) {
 
 // deliver is the fan-out helper passed to every plugin's Start. It is a
 // method on Broker so the closure captured by plugins keeps a stable
-// reference through subsequent handler subscriptions.
+// reference through subsequent handler subscriptions. Pull consumers
+// (Iris, future read-only consumers) get the same message in addition
+// to the push handlers.
 func (b *Broker) deliver(ctx context.Context, msg InboundMessage) {
 	b.mu.RLock()
 	handlers := make([]InboundHandler, len(b.handlers))
@@ -194,4 +197,5 @@ func (b *Broker) deliver(ctx context.Context, msg InboundMessage) {
 	for _, h := range handlers {
 		h(ctx, msg)
 	}
+	b.fanoutPull(msg)
 }

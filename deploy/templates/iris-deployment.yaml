@@ -1,0 +1,85 @@
+# Iris conversational pod — long-running, single replica.
+# Applied by deploy/iris-install.sh against the labyrinth k3s cluster.
+# Phase 1 / Slice 0: Claude-backed inference; bearer-token auth to
+# Minos. Phase 2 H2 routes Anthropic calls through Apollo; Phase 3
+# flips backend to Athena Ollama.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: daedalus
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: iris-secrets
+  namespace: daedalus
+type: Opaque
+stringData:
+  # All four are populated by deploy/iris-install.sh from secrets.json.
+  iris-bearer:        REPLACE_IRIS_BEARER
+  iris-admin-token:   REPLACE_IRIS_ADMIN_TOKEN
+  anthropic-api-key:  REPLACE_ANTHROPIC_KEY
+  database-url:       REPLACE_DATABASE_URL
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: iris
+  namespace: daedalus
+  labels:
+    daedalus.project/pod-class: iris
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      daedalus.project/pod-class: iris
+  template:
+    metadata:
+      labels:
+        daedalus.project/pod-class: iris
+    spec:
+      restartPolicy: Always
+      containers:
+        - name: iris
+          image: daedalus/iris:local
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: DAEDALUS_MINOS_URL
+              value: REPLACE_MINOS_URL
+            - name: IRIS_PROJECT_ID
+              value: REPLACE_PROJECT_ID
+            - name: IRIS_DEFAULT_REPO_URL
+              value: REPLACE_DEFAULT_REPO_URL
+            - name: IRIS_DEFAULT_BRANCH_PREFIX
+              value: "iris/"
+            - name: IRIS_MODEL
+              value: "claude-sonnet-4-5"
+            - name: IRIS_BEARER
+              valueFrom:
+                secretKeyRef:
+                  name: iris-secrets
+                  key: iris-bearer
+            - name: IRIS_ADMIN_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: iris-secrets
+                  key: iris-admin-token
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: iris-secrets
+                  key: anthropic-api-key
+            - name: IRIS_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: iris-secrets
+                  key: database-url
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
