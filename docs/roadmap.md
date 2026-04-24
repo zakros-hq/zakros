@@ -72,7 +72,7 @@ Goal: replace OpenClaw with a system that solves branching isolation and persist
 - Calico CNI and NetworkPolicy layering — default flannel is accepted for Phase 1 since there is one pod class that matters (Daedalus) and Iris, both running trusted plugins.
 - Charon egress proxy — Proxmox firewall IP-allowlist handles egress.
 - Asclepius — Proxmox native + systemd watch handles VM/service health.
-- Pythia, Talos, Minotaur — no research, QA, or chaos pods.
+- Pythia, Talos, Minotaur, Typhon — no research, QA, red-team, or chaos pods.
 - Multi-project registry — single-project configuration is hardcoded.
 - Mnemosyne pluggable backends — ship pgvector only. SQLite reference stays in the repo for local dev but is not a deployment target.
 - Hermes subprocess isolation, multi-plugin, message signing.
@@ -86,13 +86,15 @@ Goal: replace OpenClaw with a system that solves branching isolation and persist
 
 ---
 
-## Phase 2 — Broker layer and hardening
+## Phase 2 — Broker layer, pod-class expansion, and hardening
 
-Goal: extract the broker fleet and add the security controls Phase 1 deferred. This phase is triggered when any of the following becomes true:
+Goal: extract the broker fleet, add the pod classes that turn Daedalus from "one agent per task" into a coordinated team, and add the security controls Phase 1 deferred. This phase is triggered when any of the following becomes true:
 - A second surface (Slack, Teams, Telegram, Matrix) needs to coexist with the Phase 1 surface
 - A second operator needs non-admin access (commissioners, observers)
 - A second LLM provider (OpenAI, Google) is needed alongside Anthropic
 - Prompt injection resistance becomes a concern (e.g., agents start reading outside-contributor PRs)
+- Review volume grows past what the operator can keep up with as a human-only first pass (Momus trigger)
+- Backlog coordination across multiple pod classes becomes load-bearing (Themis trigger)
 
 ### Broker extraction
 
@@ -103,12 +105,20 @@ Goal: extract the broker fleet and add the security controls Phase 1 deferred. T
 - **Cerberus** becomes a standalone broker with pluggable ingress + verification plugin layers
 - **Argus** extracts from Minos into its own service with push-event ingest (signed audit events from every broker), drift detection deferred to Phase 3
 
+### Pod-class expansion
+
+- **Themis** — project management pod. Owns the backlog, decomposes epics into `task_type` envelopes per `architecture.md §8`, commissions work through Minos, and serves as the default routing point for Argus escalations. Does not replace Minos's control-plane role. Long-lived pod, same lifecycle shape as Iris.
+- **Momus** — code review pod. Runs on every Daedalus-opened PR as automated triage before human review. Two-stage: local tier (`qwen2.5-coder:32b` on Athena) full sweep on every PR, Apollo escalation for high-confidence findings and architectural drift. Expected 60–70% reduction in Claude calls per PR versus routing every review through Apollo. Comment-only GitHub scope; no approve / request-changes / merge.
+- **Clio** — documentation pod. Generates READMEs, API docs, changelogs, and ADR formatting. `docs/**`-scoped GitHub App token; cannot mutate application code. Reactive mode (per merged PR) and scheduled rollup (drift reconciliation).
+- **Prometheus** — DevOps / release pod. Owns pipeline config, version bumping, artifact publication, and environment promotion. Production promotion is a high-blast scope requiring an operator confirmation token.
+- **Hephaestus** — architectural assistant. Drafts ADRs and surfaces coupling / topology concerns; produces draft artifacts only (`docs/adr/proposed/**`, `docs/reports/**`). Promotion to `docs/adr/accepted/**` is human-only. Claude-tier by default (Sonnet; Opus on operator request for genuinely ambiguous structural decisions).
+
 ### Hardening
 
 - **JWT MCP broker authentication** — Minos signs per-pod tokens (Ed25519), brokers verify with public key, scopes enforced per call, audit to Ariadne
 - **Trust boundary contract** codified in the worker backend plugin interface — trusted/untrusted framing primitives the plugin surfaces to its LLM
 - **High-blast confirmation tokens** — scope-marked operations require human approval via the task thread before execution; confirmation bound to operation content (not just scope name)
-- **Pairing flow + identity registry** — `(surface, surface_id)` identities, role bundles (`admin`, `commissioner`, `observer`), `/pair` approval flow, revocation with last-admin protection, bootstrap from config
+- **Pairing flow + identity registry** — `(surface, surface_id)` identities, role bundles (`admin`, `commissioner`, `observer`, `system` — the last for internal pods that commission autonomously; see `architecture.md §11 Authority Model`), `/pair` approval flow (human roles only; `system` bypasses pairing), revocation with last-admin protection (human roles only — `system` has no last-identity protection), bootstrap from config for human admins and from the `system_identities` block in `deploy/config.json` for `system` identities
 - **Break-glass session minting** — `break_glass.observe` and `break_glass.shell` capabilities, short-lived k3s ServiceAccount tokens, k3s audit log shipped to Ariadne
 - **Mnemosyne untrusted-source tagging** — run records carry trust markers, context assembly preserves them across runs so injected content does not escalate to "trusted context" between runs
 - **Mnemosyne fact-extraction maturity** — extraction pipeline refinement, per-project retention tuning, index rebuild tooling
@@ -119,6 +129,10 @@ Goal: extract the broker fleet and add the security controls Phase 1 deferred. T
 - A second LLM provider plugin works alongside Anthropic, with Apollo-reported usage
 - A high-blast scope invocation from a pod blocks until the operator approves in-thread
 - An injected prompt in a PR comment does not escalate to a high-blast MCP call
+- Momus reviews every Daedalus-opened PR before it reaches the human reviewer, with review comments posted to the PR
+- Themis decomposes a multi-task operator request from Iris into an ordered plan, commissions each task through Minos, and reports progress back through Iris
+- An Argus escalation reaches Themis, is classified (halt / re-plan / escalate-to-human), and the corresponding Minos action fires without operator intervention for the re-plan case
+- Clio opens a `docs/**` PR after a feature PR merges; Hephaestus opens a draft ADR in `docs/adr/proposed/**` without ever writing to `docs/adr/accepted/**`; Prometheus cuts a release and is blocked on production promotion pending the operator's confirmation token
 
 ---
 
@@ -128,7 +142,8 @@ Goal: add the surfaces, pod classes, and operational tooling that broaden what D
 
 - **Pythia** research pods with the research MCP broker; prompt-injection surface annotation; per-task domain allowlists
 - **Talos** QA/test pods with test-environment provisioning
-- **Minotaur** sandboxed destructive test runner
+- **Minotaur** red team pod — adversarial reasoning against Daedalus itself. Finds non-obvious attack paths, chains vulnerabilities, probes prompt injection against internal agents and MCP brokers. Claude-tier (Sonnet default, Opus for adversarial depth) — a local model running patterns is a second security scanner, not red teaming.
+- **Typhon** sandboxed destructive test runner — chaos-engineering counterpart to Minotaur. Intentionally breaks infrastructure and code paths inside isolated workspaces to validate recovery automation. Minotaur breaks agents; Typhon breaks infra.
 - **Athena Development Sandboxes** — Athena MCP sandbox surface (`sandbox.create`/`destroy`/`exec`), launchd-managed per-sandbox users, allocated port ranges. Lands in Phase 3 rather than Phase 2 because per-pod source scoping for sandbox reachability depends on the Calico/NetworkPolicy layer, which is itself Phase 3.
 - **Charon** egress proxy with SNI-passthrough, per-pod-class allowlists, per-task egress additions
 - **Asclepius** health monitor in its own LXC; polls every Crete service; alerts via Hermes; MCP surface for operator queries
@@ -158,4 +173,4 @@ When referring back to an architecture or security doc that mentions a deferred 
 
 ---
 
-*This document is the authoritative source for phase assignments. Update here first, propagate to `architecture.md §16` and affected section tags, then update `security.md` and `environment.md` cross-references.*
+*This document is the authoritative source for phase assignments. Update here first, propagate to `architecture.md §21` and affected section tags, then update `security.md` and `environment.md` cross-references.*

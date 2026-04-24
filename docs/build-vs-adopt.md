@@ -116,7 +116,7 @@ Candidates: `grafana/mcp-grafana` (Apache-2, vendor-official, LogQL + Prometheus
 - **Goose** — Apache-2, Linux Foundation AAIF, very active; MCP-native by design — `capabilities.mcp_endpoints[]` maps directly onto extensions. `goose serve` closes the headless gap. Gap: recipes are YAML-parameterized, not arbitrary JSON briefs — adapter translates envelope → recipe parameters; status redirect needs a goose-side MCP client pointed at the `thread` sidecar. **Write-adapter candidate, best pure MCP fit.**
 - **Cline** — Apache-2; 2026 CLI + gRPC closes the VS Code requirement. TypeScript/Node runtime adds a dep surface that offers nothing OpenHands/Goose don't. **Pass.**
 
-### Memory systems (vs §14)
+### Memory systems (vs §19)
 
 - **mem0** — Apache-2; extracted-fact-primary architecture contradicts the run-record-primary decision already taken; no pre-persistence sanitization hook; flat `user_id`/`agent_id` scoping. **Pass.**
 - **Letta** — Apache-2; memory scoped to agent instances, not projects — wrong orientation for a memory service *behind* multiple agents. Postgres + pgvector supported. **Pass.**
@@ -130,7 +130,7 @@ Candidates: `grafana/mcp-grafana` (Apache-2, vendor-official, LogQL + Prometheus
 - **1Password Connect** — Mandatory 1password.com control plane; fails self-containment. **Pass.**
 - **Cloud SMs (AWS/GCP/Azure)** — Not self-hostable. **Pass.**
 
-### Egress proxy (vs §11 Charon)
+### Egress proxy (vs §16 Charon)
 
 - **Squid (Peek-and-Splice)** — GPL-2.0, active. `ssl_bump peek step1 / splice all` gives SNI decision without MITM. `logformat` maps to the contract tuple (pod_id derived from per-class listener port, not native). `squid -k reconfigure` reloads ACLs without dropping connections. Dense config; Peek-and-Splice is a historical footgun.
 - **Envoy** — Apache-2, CNCF. `tls_inspector` + `filter_chain_match.server_names` = canonical SNI-passthrough. Native JSON access log matches the contract tuple directly. xDS for zero-downtime reloads (overkill; file reload with `drain_time_s` simpler). ~100MB baseline, hundreds of YAML lines for a trivial allowlist.
@@ -145,12 +145,62 @@ Candidates: `grafana/mcp-grafana` (Apache-2, vendor-official, LogQL + Prometheus
 - **ngrok** — Self-hostable path effectively dead (v1 unmaintained >6yr; v3/Cloud Edge proprietary SaaS). **Pass.**
 - **smee.io** — "Not for production"; one channel == one target, minimal routing; maintenance low. Consider **gosmee** (self-hostable Go rewrite) as a future local-dev plugin. **Pass for production.**
 
-### Health monitor (vs §13 Asclepius)
+### Health monitor (vs §18 Asclepius)
 
 - **Netdata** — GPL-3.0, very active. Strong liveness/resource/custom via collectors; flow checks need custom collectors. **No Postgres-native history** (own tiered DB); no MCP surface; remediation via scripts only. Data plane excellent — keep as per-node diagnostic alongside Asclepius, not as Asclepius core.
 - **Prometheus + Alertmanager + node/blackbox exporters** — Apache-2, CNCF. Best check-kind coverage. TSDB is local — hybrid model required (Prometheus holds metrics; thin Asclepius service holds `asclepius` Postgres schema for transitions + remediation audit + MCP broker; Alertmanager webhooks trigger state transitions). Cross-monitoring via mutual `/health` scrape is native. **Write-adapter; adopt.**
 - **Consul** — BSL 1.1, no healthy fork at production maturity. Keeps current state in Raft log, not history — defeats the "transition history in `asclepius` schema" design. **Pass.**
 - **Uptime Kuma / Zabbix / checkmk** — **Pass.**
+
+### Code review pods (vs §12 Momus)
+
+Candidates: CodeRabbit (proprietary SaaS), GitHub Copilot for PRs (proprietary, GitHub-hosted), Reviewpad (archived Feb 2024), `danielchalef/automated-code-reviewer` (MIT, GPT-only, single tool), `mattzcarey/code-review-gpt` (MIT, last release 2024-Q4), `sourcery-ai` (CLI + SaaS hybrid).
+
+- **CodeRabbit / Copilot** — SaaS-only. Fails self-containment; reviewer LLM hosted outside Daedalus's inference plane; no way to route the escalation tier through Apollo. **Pass.**
+- **Reviewpad** — Rules-DSL approach, no AI review component; archived upstream. **Pass.**
+- **code-review-gpt / automated-code-reviewer** — Single-tier (no local triage), hardcoded OpenAI client, no MCP surface, no structured verdict output — just diff-context prompts. Useful as *prompt references* for the escalation tier. **Pass, keep prompts.**
+- **Sourcery** — CLI component is self-hostable but rule-based (no LLM-review tier); SaaS tier is where the AI review lives. Split-model doesn't compose with Apollo-on-internal-network. **Pass.**
+
+**Recommendation: write in-house.** Two-stage local-triage + Apollo-escalation architecture is the load-bearing economic decision (60–70% Claude-call reduction); no surveyed candidate splits local/remote this way. Architectural-drift detection against in-repo ADRs is also a Daedalus-specific surface — needs to read `docs/adr/accepted/` and flag divergence, which upstream reviewers don't model.
+
+### Documentation pods (vs §13 Clio)
+
+Candidates: Mintlify (SaaS, proprietary), docusaurus-based generators (framework, not generator), `TheodoreGalanos/SAID` (stale), `openai/swarm` doc examples, Doxygen / Sphinx / MkDocs (non-AI, format tools), `continuedev/autodev` (IDE-embedded, not headless).
+
+- **Mintlify** — SaaS; LLM-review tier hosted externally; no way to scope write path to `docs/**`. **Pass.**
+- **Sphinx / MkDocs / Doxygen** — Format tools, not generators. These are *dependencies* of a Clio implementation (the doc format target), not alternatives to it. **Keep as output-format references.**
+- **continuedev/autodev** — IDE-embedded, not designed as a headless pod that opens PRs against a doc path. **Pass.**
+
+**Recommendation: write in-house.** Clio's contract — scheduled rollup, `docs/**`-only GitHub scope, Mnemosyne-informed project glossary — has no upstream match. The actual *doc content* work (README section generation, CHANGELOG formatting, API-doc scaffolding) is template-heavy and well-suited to the local `qwen3.5:27b` tier.
+
+### DevOps / release pods (vs §14 Prometheus)
+
+Candidates: semantic-release (MIT, release-only), release-please (Apache-2, Google-backed, release-only), Dagger (Apache-2, pipeline DSL), Earthly (MPL-2.0, pipeline DSL), Spinnaker (Apache-2, multi-env promotion), Argo Rollouts (Apache-2, k8s-native promotion).
+
+- **semantic-release / release-please** — Version-bump and changelog-cut only. Useful as *components* Prometheus invokes, not alternatives to Prometheus. **Adopt as underlying tools.**
+- **Dagger / Earthly** — Pipeline DSLs; the "how to build" layer, not "what to release when." Orthogonal. **Keep as pipeline-authoring references.**
+- **Spinnaker** — Full promotion orchestrator but heavy (JVM stack, multi-service deploy). Overkill for a single-operator homelab; Phase 2 target is single-project multi-environment, not multi-project enterprise. **Pass for Phase 2; reconsider if multi-project scope arrives.**
+- **Argo Rollouts** — k8s-native canary/blue-green for Labyrinth-deployed workloads. Useful *target* for the Prometheus production-promotion MCP, not a replacement for Prometheus's decision layer. **Keep as promotion-target reference.**
+
+**Recommendation: write in-house, adopt release-please + semantic-release as sub-components.** Prometheus's role is orchestration (read CHANGELOG → decide bump → sequence environments → gate prod on confirmation token); the arithmetic of semver bumps and changelog formatting is offloaded to existing tools.
+
+### Architectural-assistant pods (vs §15 Hephaestus)
+
+Candidates: Structurizr (C4-model DSL, non-AI), archunit / dependency-cruiser (static analyzers, non-AI), `adr-tools` (Nygard's shell scripts, non-AI), `log4brains` (ADR-rendering static site, non-AI).
+
+No AI-architectural-assistant candidates surveyed. All upstream tools in this space are either (a) static dependency/coupling analyzers with no reasoning layer, or (b) ADR *formatters* without authoring capability.
+
+**Recommendation: write in-house.** Hephaestus is a Claude-heavy pod; its value is the reasoning, not the format. Adopt `adr-tools` structure (numbered `docs/adr/NNNN-slug.md`) as the output convention. Consume archunit-style static analysis (language-appropriate tools per project) as *input* to the coupling reports.
+
+### Project-management pods (vs §11 Themis)
+
+Candidates: `AgentGPT` / `AutoGPT` / `BabyAGI` (task-decomposition demos from 2023), `CrewAI` (Apache-2, agent orchestration framework), `LangGraph` (MIT, agent graph framework), `modal-labs/devlooper` (task-scoped agents), `microsoft/autogen` (MIT, multi-agent orchestration).
+
+- **AgentGPT / AutoGPT / BabyAGI** — Demo-grade; no production-ready task persistence, no scope enforcement, no external command surface. **Pass.**
+- **CrewAI / AutoGen / LangGraph** — Agent orchestration frameworks. These model *how agents talk to each other*, not *how a backlog decomposes to a team of pod classes with MCP capabilities*. The envelope-schema decomposition Themis does is a Daedalus-specific shape. **Keep as decomposition-pattern references.**
+- **devlooper** — Scope-narrowed task runner, single-task orientation. **Pass.**
+
+**Recommendation: write in-house.** Themis commissions through Minos's existing task API; its job is decomposition into `task_type` envelopes and cross-pod state tracking, not generic agent coordination. CrewAI/AutoGen are interesting as references for the decomposition prompting but don't compose with Daedalus's capability model.
 
 ---
 

@@ -19,7 +19,7 @@ This file exists so that:
 
 ### Crete — Minisforum MS-01
 
-**Referenced in:** `architecture.md §3`, `§4`, `§16`
+**Referenced in:** `architecture.md §3`, `§4`, `§21`
 
 Specific hardware: Intel i9-13900H, 96GB DDR5, 2× 1TB NVMe (ZFS mirror), third M.2 reserved, multi-NIC (2× 2.5Gb + 2× 10Gb), Proxmox VE 9.x.
 
@@ -65,7 +65,7 @@ Contract: none required for Daedalus. pfSense remains present in this homelab fo
 
 ### 12-VLAN Homelab Architecture
 
-**Referenced in:** `architecture.md §18` (VLAN assignment open question)
+**Referenced in:** `architecture.md §23` (VLAN assignment open question)
 
 Specific VLAN topology of the homelab. Assignment for Crete is unresolved.
 
@@ -77,11 +77,11 @@ Contract: the architecture assumes VLAN-level network segmentation is available;
 
 ### Infisical
 
-**Referenced in:** `architecture.md §6`, `§17`; `security.md §3`
+**Referenced in:** `architecture.md §6`, `§22`; `security.md §3`
 
 Specific Infisical instance serves as the homelab implementation of Minos's secret provider interface (`architecture.md §6`). Holds the secrets Minos injects into pods via machine identity.
 
-**Phase 1 default is the file-backed provider**, not Infisical — this keeps a clean Phase 1 install self-contained on Crete with no dependency on an external secrets service. Both provider implementations ship in Phase 1 (see `architecture.md §17` MVP Blockers — Secret provider); Infisical is selected instead of the default when a homelab deployment already runs it. The durable rotation story (Hecate-fronted credential fetches with JWT ACLs) is Phase 2+; Phase 1 rotation under either provider is restart-driven.
+**Phase 1 default is the file-backed provider**, not Infisical — this keeps a clean Phase 1 install self-contained on Crete with no dependency on an external secrets service. Both provider implementations ship in Phase 1 (see `architecture.md §22` MVP Blockers — Secret provider); Infisical is selected instead of the default when a homelab deployment already runs it. The durable rotation story (Hecate-fronted credential fetches with JWT ACLs) is Phase 2+; Phase 1 rotation under either provider is restart-driven.
 
 Contract: Minos (Phase 1) or Hecate (Phase 2+) can obtain per-project, per-task credentials from a secret store at spawn time without human interaction, and can rotate them without disrupting running agents. Any provider implementation meeting this contract is a valid substitute. Named alternatives:
 
@@ -109,7 +109,7 @@ Phase 2 flat-surface plugins are supported; the project does not attempt to pape
 
 ### GitHub
 
-**Referenced in:** `architecture.md §6`, `§8`, `§17`; `security.md §5`
+**Referenced in:** `architecture.md §6`, `§8`, `§22`; `security.md §5`
 
 Daedalus assumes GitHub as the code host — PATs, webhooks, branch protection, PR events drive the agent lifecycle.
 
@@ -117,7 +117,7 @@ Contract: a Git host that supports scoped machine credentials, webhook delivery 
 
 ### Anthropic Workspace (Claude API)
 
-**Referenced in:** `architecture.md §6 Credential Handling`, `§7 Phase 1 budget posture`, `§11 Egress Granularity`; `security.md §3`, `§13`
+**Referenced in:** `architecture.md §6 Credential Handling`, `§7 Phase 1 budget posture`, `§16 Egress Granularity`; `security.md §3`, `§13`
 
 Specific Anthropic workspace backs the operator's `claude-code` subscription. Phase 1 Daedalus pods invoke `claude-code` directly against this workspace; the API key or OAuth token is injected into every Daedalus pod at spawn.
 
@@ -150,7 +150,7 @@ Contract: the architecture reserves Hydra VM workspaces for full-OS tasks. The s
 
 ### OpenClaw
 
-**Referenced in:** `architecture.md §16`, `§18`
+**Referenced in:** `architecture.md §21`, `§23`
 
 Pre-existing agent implementation that Daedalus replaces. Phase 1 calls for migrating its behavior into the Minos/Argus separation.
 

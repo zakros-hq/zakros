@@ -24,13 +24,13 @@ Phase 1 deliberately accepts a lax posture on most of these controls in exchange
 
 **Phase: 1 (minimal), 2 (full).** Phase 1 ships a **single hardcoded admin** `(surface, surface_id)` tuple in Minos config — every command intake checks "is this the admin?" against that config and nothing else. The full identity model below is Phase 2.
 
-**Status: Addressed architecturally for Phase 2.** `architecture.md §6` defines the identity model (`(surface, surface_id)` tuples with role and status), a capability-based authorization model (`task.commission.*`, `task.direct`, `task.query_state`, `identity.approve_pairing`, `identity.manage`), preset roles (`admin`, `commissioner`, `observer`) with per-identity capability overrides, the pairing flow (`/pair` → admin approval with role specification → active), bootstrap via config-file or CLI at install time, revocation semantics including last-admin protection, and the audit trail. Phase 3 adds an admin web UI and per-project scoping.
+**Status: Addressed architecturally for Phase 2.** `architecture.md §6` defines the identity model (`(surface, surface_id)` tuples with role and status), a capability-based authorization model (`task.commission.*`, `task.direct`, `task.query_state`, `identity.approve_pairing`, `identity.manage`), preset roles (`admin`, `commissioner`, `observer`, and `system` for internal pods that commission autonomously under a persisted identity — see `architecture.md §11 Authority Model`) with per-identity capability overrides, the pairing flow (`/pair` → admin approval with role specification → active; `system` identities bypass pairing and are provisioned at pod-deployment time), bootstrap via config-file or CLI at install time for human admins (and via the `system_identities` block in `deploy/config.json` for `system` identities), revocation semantics including last-admin protection (human roles only — `system` identities carry no last-identity protection), and the audit trail. Phase 3 adds an admin web UI and per-project scoping.
 
 **Remaining implementation work:**
-- Pairing token expiration window and whether single-admin approval is sufficient or a quorum is required (open question in `architecture.md §18`)
+- Pairing token expiration window and whether single-admin approval is sufficient or a quorum is required (open question in `architecture.md §23`)
 - Rate limiting on `/pair` to prevent spam from a single source
 - Identity-registry schema migrations for Phase 2 scope expansion
-- Audit-log retention policy for pairing events (ties to Ariadne retention, `architecture.md §18`)
+- Audit-log retention policy for pairing events (ties to Ariadne retention, `architecture.md §23`)
 
 ---
 
@@ -155,7 +155,7 @@ The pattern is universal — it applies identically to Athena (§7), Hermes (§4
 
 **Remaining implementation work:**
 
-- Direct Ollama / Qdrant / embedding-server ports on Athena: do they remain network-trusted behind pfSense/Proxmox firewall (current design), or do they also require JWT auth at the service level? Current default is "MCP broker fronts the inference surface; direct service ports remain inside Athena and only the MCP is pod-reachable." Verify that no direct-service-port paths leak.
+- Direct Ollama / Qdrant / embedding-server ports on Athena: Athena exposes two caller-authentication surfaces with different trust models. The Ollama port is reachable directly from local-model-backend pods (Iris §10, and the Phase 2 pod fleet — Themis §11, Momus §12, Clio §13, Prometheus §14) gated by network trust (Proxmox firewall + Labyrinth egress policy). The Athena MCP fronts the higher-privilege surfaces (`models.pull`, `models.load`, `sandbox.*`, `corpus.refresh`) and the JWT-scoped inference path (`inference.query`) that Pythia §9 uses for broker-fronted summarization. Two patterns coexist by design. Phase 2 work: confirm no MCP-only operations leak via the direct port path (Ollama's native API should be inference-only at the port Labyrinth can reach) and that Qdrant / embedding-server ports remain MCP-fronted (not in the direct-HTTP set).
 - Sandbox-caller scoping — `sandbox.exec` on a specific `sandbox_id` should only be allowed to the pod that created that sandbox; enforcement lives in the Athena MCP, possibly via a per-sandbox scope injected into subsequent JWTs.
 - Corpus write operations (beyond `corpus.refresh`) — any direct writes to Qdrant collections from operator surfaces need explicit scope names; currently all writes flow through `corpus.refresh` which is too coarse for fine-grained collection management.
 
@@ -165,17 +165,17 @@ The pattern is universal — it applies identically to Athena (§7), Hermes (§4
 
 **Threat:** "GitHub on outbound HTTPS" at wildcard granularity invites exfiltration via `gist.githubusercontent.com`, raw content, or Pages. Agents run LLM-generated code that may make arbitrary outbound calls.
 
-**Phase: 1 (IP-range allowlist), 3 (Charon SNI proxy).** Phase 1 is Proxmox IP-range enforcement with the known limitation that GitHub-hosted surfaces share CIDR with api.github.com. Charon, hostname-layer allowlists, and per-task egress additions land in Phase 3 when Pythia/Talos/Minotaur create divergent per-class egress needs.
+**Phase: 1 (IP-range allowlist), 3 (Charon SNI proxy).** Phase 1 is Proxmox IP-range enforcement with the known limitation that GitHub-hosted surfaces share CIDR with api.github.com. Charon, hostname-layer allowlists, and per-task egress additions land in Phase 3 when Pythia/Talos/Minotaur/Typhon create divergent per-class egress needs.
 
-**Status: Addressed architecturally.** `architecture.md §11 Egress Granularity` defines:
+**Status: Addressed architecturally.** `architecture.md §16 Egress Granularity` defines:
 
-- **Phase 1** — Proxmox firewall enforces an IP-range allowlist; GitHub IP ranges fetched from `api.github.com/meta` refreshed daily, package registry CDN CIDRs refreshed weekly, Anthropic API CDN ranges for `claude-code`'s direct provider call from every Daedalus pod. Known limitation: hostname-level differentiation within a shared CIDR (GitHub API vs raw vs gists) is not enforceable at this layer. Accepted Phase 1 risk given the single-operator deployment running trusted plugins (`claude-code`, Iris backed by Athena-local Ollama). **Phase 2 Apollo collapse:** once Apollo holds the Anthropic credential (Phase 2), the pod-side Anthropic allowlist entry collapses to "Apollo broker only" and external LLM egress stops crossing the Labyrinth vNIC (`architecture.md §11 Egress Granularity`).
+- **Phase 1** — Proxmox firewall enforces an IP-range allowlist; GitHub IP ranges fetched from `api.github.com/meta` refreshed daily, package registry CDN CIDRs refreshed weekly, Anthropic API CDN ranges for `claude-code`'s direct provider call from every Daedalus pod. Known limitation: hostname-level differentiation within a shared CIDR (GitHub API vs raw vs gists) is not enforceable at this layer. Accepted Phase 1 risk given the single-operator deployment running trusted plugins (`claude-code`, Iris backed by Athena-local Ollama). **Phase 2 Apollo collapse:** once Apollo holds the Anthropic credential (Phase 2), the pod-side Anthropic allowlist entry collapses to "Apollo broker only" and external LLM egress stops crossing the Labyrinth vNIC (`architecture.md §16 Egress Granularity`).
 - **Phase 3** — **Charon** egress proxy (dedicated Proxmox LXC on Crete) in SNI-passthrough mode. Per-pod-class allowlist by port (Daedalus, Pythia, Talos each listen separately); k3s NetworkPolicy restricts pod→port reachability; every request logged to Ariadne. Proxmox firewall collapses to "Labyrinth → Charon only" for external egress.
 - **Per-task egress additions** — Phase 3 task schema grows `capabilities.egress_hosts` for temporary per-task additions.
 
 **Remaining implementation work:**
 
-- Specific Daedalus-class hostname allowlist (the current list in `architecture.md §11` is illustrative; the actual curated list needs Phase 1 review)
+- Specific Daedalus-class hostname allowlist (the current list in `architecture.md §16` is illustrative; the actual curated list needs Phase 1 review)
 - Pythia denylist contents (Phase 3) — known-malicious domains, known-exfil-risk endpoints
 - Charon audit-log schema — exact fields that land in Ariadne; whether SNI-only is sufficient or whether Host-header peek (which would require TLS termination) is needed for any specific case
 - Fallback when Charon is down — do pods lose external egress entirely, or does Proxmox IP-range fallback take over? Interacts with `security.md §9` on layered enforcement precedence.
@@ -186,9 +186,9 @@ The pattern is universal — it applies identically to Athena (§7), Hermes (§4
 
 **Threat:** k3s with default CNI (flannel) is flat — pods can reach each other by default. A compromised pod can reach every other active pod's sidecar and workspace.
 
-**Phase: 3.** Phase 1 ships **flannel (flat pod network)** — the explicit tradeoff of MVP scope. With only Daedalus and Iris pods running trusted plugins on a single-operator deployment, flat is acceptable. Calico + default-deny + per-pod-class NetworkPolicies land in **Phase 3** alongside the divergent pod classes (Pythia, Talos, Minotaur).
+**Phase: 3.** Phase 1 ships **flannel (flat pod network)** — the explicit tradeoff of MVP scope. With only Daedalus and Iris pods running trusted plugins on a single-operator deployment, flat is acceptable. Calico + default-deny + per-pod-class NetworkPolicies land in **Phase 3** alongside the divergent pod classes (Pythia, Talos, Minotaur, Typhon).
 
-**Status: Addressed architecturally for Phase 3.** `architecture.md §11 Pod-to-Pod Isolation` defines:
+**Status: Addressed architecturally for Phase 3.** `architecture.md §16 Pod-to-Pod Isolation` defines:
 
 - **CNI: Calico** swap lands in Phase 3 (mature NetworkPolicy enforcement, light footprint for single-node k3s). Phase 1–2 ship flannel per the roadmap; Phase 3 may revisit Cilium if eBPF observability or L7 policies become worth the overhead.
 - **Default-deny pod-to-pod traffic.** All intra-cluster traffic denied unless explicitly allowed. The architecture's broker-mediated coordination pattern (Daedalus → research broker → Pythia, never direct) makes default-deny natural — no legitimate cross-pod flows exist.
@@ -201,7 +201,7 @@ The pattern is universal — it applies identically to Athena (§7), Hermes (§4
 - Concrete NetworkPolicy manifests per pod class (mostly mechanical YAML once the allow-list destinations are known)
 - k3s system exceptions — standard k3s NetworkPolicy needed for CoreDNS, metrics-server, probe ingress to pods (standard recipes available)
 - Integration test: deploy a test pod, attempt traffic to every other pod class, confirm all denied
-- Calico operator installation and version-upgrade path within k3s upgrades (§10 Upgrades and Maintenance)
+- Calico operator installation and version-upgrade path within k3s upgrades (`architecture.md §16 Upgrades and Maintenance`)
 
 ---
 
@@ -221,7 +221,7 @@ The pattern is universal — it applies identically to Athena (§7), Hermes (§4
 
 **Remaining implementation work:**
 
-- Default session TTL and extension policy (tracked as an open question in `architecture.md §18`)
+- Default session TTL and extension policy (tracked as an open question in `architecture.md §23`)
 - ClusterRole templates for observe/shell — the exact RBAC verbs matching each level, tested that `observe` cannot escalate to exec paths
 - Emergency revocation path — how an in-flight session is killed mid-command if an incident unfolds faster than TTL
 - Phase 2 session recording (capture operator's kubectl stream for replay) for compliance-heavy deployments
@@ -233,6 +233,17 @@ The pattern is universal — it applies identically to Athena (§7), Hermes (§4
 
 **Threat:** Agents read source code, issue text, and PR comments — all attacker-controllable on public repos or repos with outside contributors. A successful injection against an agent with MCP access to GitHub write, Proxmox, or Terraform has a very high blast radius. Pythia's arbitrary-web-content responses multiply the exposure.
 
+**Per-pod-class untrusted-input surfaces.** The Phase 2 pod expansion brings new attacker-reachable input channels that flow through the same §8 trust-boundary contract:
+
+- **Momus (`architecture.md §12`)** — reads PR diffs, commit messages, and review comments. Diffs are attacker-controllable on any repo with outside contributors. Capability gating is the backstop: Momus has `pr.comment` only, no `pr.approve` / `pr.merge` / push.
+- **Clio (`architecture.md §13`)** — reads commit history, Momus review output, and Hephaestus topology reports as inputs. Commit messages and merged-PR titles are attacker-reachable on contributor PRs. Clio's GitHub writes are path-scoped to `docs/**` at the `github` MCP broker (not at the installation token).
+- **Prometheus (`architecture.md §14`)** — reads release changelogs, version files, and pipeline configuration. CHANGELOG content is derived from merged PRs (attacker-influenceable upstream) and from Clio output (one trust-boundary hop further). Production promotion is a high-blast scope requiring an operator confirmation token, so injection cannot drive autonomous prod deploy.
+- **Hephaestus (`architecture.md §15`)** — reads repo structure, Mnemosyne context, and operator-provided ADR topic briefs. Produces draft artifacts only (`docs/adr/proposed/**`, `docs/reports/**`); promotion to `docs/adr/accepted/**` requires a human PR merge on a path-scoped write broker.
+- **Themis (`architecture.md §11`)** — receives NL requests from Iris (user-authored) and Argus escalations (broker-sourced, not attacker-authored). User NL is untrusted at the §8 level; Argus events are trusted telemetry.
+- **Typhon (`architecture.md §3`, Phase 3)** — destructive-test outputs could contain attacker-influenceable content if the target under test is contributor-reachable; scoped internal-only egress limits exfil blast radius.
+
+All these surfaces route through the §8 untrusted-read contract — tool-output framing, no follow-instructions-in-data, high-blast gated by confirmation token. Capability gating is the backstop when framing fails.
+
 **Phase: 2 (trust boundary contract + high-blast confirmation), 3 (Pythia content filter + Argus drift detection).** Phase 1 ships **without** the formal trust-boundary contract in the plugin interface — the single-operator single-project trusted-plugin (`claude-code`) posture is the accepted MVP tradeoff. Injection defenses land once the layered design below is actually needed (second operator, second project, contributor PRs, Pythia landing in Phase 3).
 
 **Status: Addressed architecturally for Phase 2+.** The design defends in layers:
@@ -241,13 +252,13 @@ The pattern is universal — it applies identically to Athena (§7), Hermes (§4
 
 2. **Pythia response annotation** (`architecture.md §9 Prompt Injection Surface`) — Pythia responses always carry explicit untrusted-content markers. The Daedalus agent's plugin preserves those markers in tool-output framing.
 
-3. **Mnemosyne untrusted-source tagging** (`architecture.md §14 Secret Sanitization`) — run records tag content by source trust level; Mnemosyne preserves tags across context-injection cycles. Injection planted in run N does not become "trusted context" when surfaced in run N+1. **Phase 1 exception:** untrusted-source tagging is Phase 2. Phase 1 Mnemosyne stores and reinjects run records without tags, so an injection planted in run N *does* surface as part of trusted context in run N+1. This is an explicitly accepted Phase 1 risk given the single-operator single-project trusted-plugin posture; see `architecture.md §14 Phase 1 cross-run injection risk` for the full statement.
+3. **Mnemosyne untrusted-source tagging** (`architecture.md §19 Secret Sanitization`) — run records tag content by source trust level; Mnemosyne preserves tags across context-injection cycles. Injection planted in run N does not become "trusted context" when surfaced in run N+1. **Phase 1 exception:** untrusted-source tagging is Phase 2. Phase 1 Mnemosyne stores and reinjects run records without tags, so an injection planted in run N *does* surface as part of trusted context in run N+1. This is an explicitly accepted Phase 1 risk given the single-operator single-project trusted-plugin posture; see `architecture.md §19 Phase 1 cross-run injection risk` for the full statement.
 
 4. **Capability gating with human confirmation** (`architecture.md §6 MCP Broker Authentication`) — high-blast scopes (push to protected branch, VM creation, corpus refresh, sandbox creation) require a confirmation token minted by Minos upon explicit human approval through the task thread. An injected agent can *attempt* high-blast calls but cannot complete them without a human saying yes.
 
 5. **Capability containment** — even without confirmation gating, MCP broker JWT validation refuses calls outside the task's composed scope. Egress containment comes from Proxmox firewall (Phase 1) and Charon (Phase 2 with per-task domain allowlists for Pythia).
 
-6. **Anomaly detection** (`architecture.md §16 Phase 2`) — Argus Phase 2 drift detection watches for injection patterns: read-untrusted-then-invoke-high-blast sequences, scope drift from declared task brief, unusual egress patterns. Phase 2 also adds a Pythia content filter that flags injection-shaped patterns before returning.
+6. **Anomaly detection** (`architecture.md §21 Phase 2`) — Argus Phase 2 drift detection watches for injection patterns: read-untrusted-then-invoke-high-blast sequences, scope drift from declared task brief, unusual egress patterns. Phase 2 also adds a Pythia content filter that flags injection-shaped patterns before returning.
 
 **Remaining implementation work:**
 

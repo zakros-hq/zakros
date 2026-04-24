@@ -47,7 +47,7 @@ Daedalus is a systems/orchestration codebase — the architectural neighbors are
 
 ### Repository: monorepo
 
-Single repository, structure per `architecture.md §15`. Maintainability reasons:
+Single repository, structure per `architecture.md §20`. Maintainability reasons:
 
 - **Cross-cutting code is load-bearing.** Task envelope schemas (`schemas/`), provider interface, JWT signing library, plugin interface contract, broker auth middleware — every service depends on these. Monorepo makes cross-cutting changes atomic and reviewable in one diff.
 - **One operator, one deployment.** There is no independent release cadence or independent team to justify multi-repo coordination cost.
@@ -93,7 +93,7 @@ Hypervisor setup is one-time and intentionally out of scope for automation — t
 **Networking:**
 - Proxmox bridge `vmbr0` bound to the uplink NIC with VLAN-aware mode enabled
 - All VLAN tags used by Daedalus guests (management, services) configured on `vmbr0` — the guests attach via tagged subinterfaces in Terraform
-- Specific VLAN IDs are a Phase 1 open question per `architecture.md §18`; confirm them before Terraform runs
+- Specific VLAN IDs are a Phase 1 open question per `architecture.md §23`; confirm them before Terraform runs
 - Edge firewall (pfSense or equivalent) has a rule allowing admin access to Crete from the operator workstation VLAN
 
 **Terraform access:**
@@ -193,14 +193,14 @@ Slice A starts from this point.
    - Migration tooling chosen (golang-migrate, goose, or atlas — decide at implementation); first migration lands the Slice A `tasks` table in the `minos` schema
 
 2. **Ariadne log stack install** (Ariadne VM)
-   - Install Vector as the ingest shipper and Loki as the log store per `architecture.md §12`
+   - Install Vector as the ingest shipper and Loki as the log store per `architecture.md §17`
    - Configure Vector on each Daedalus guest to forward stdout/journald to Ariadne's Loki
    - Query-side work (Grafana, ariadne MCP) is deferred; Phase 1 debugging uses direct LogQL
 
 3. **k3s install** (Labyrinth VM)
    - Single-node k3s with default flannel CNI
-   - Host nftables rules per `architecture.md §11 Network Isolation`
-   - Proxmox-vNIC firewall allowlist per `architecture.md §11 Egress Granularity`
+   - Host nftables rules per `architecture.md §16 Network Isolation`
+   - Proxmox-vNIC firewall allowlist per `architecture.md §16 Egress Granularity`
    - `kubectl` access configured on Minos VM (the only expected caller in Phase 1)
 
 4. **Shared Go modules in monorepo**
@@ -211,7 +211,7 @@ Slice A starts from this point.
 
 5. **Secret provider: file-backed reference**
    - Implements the `pkg/provider` interface reading from a YAML/JSON file under the Minos config directory
-   - Phase 1 shipping default per `architecture.md §17` MVP Blockers — Secret provider
+   - Phase 1 shipping default per `architecture.md §22` MVP Blockers — Secret provider
    - Infisical provider is a Slice A stretch goal; not a blocker for the acceptance checkpoint
 
 6. **Minos core — minimum viable**
@@ -345,7 +345,7 @@ Landing D in parallel with B ensures every later slice runs under real guardrail
 
 **Proves:** run records persist; `awaiting-review` hibernation + respawn with Mnemosyne context drives the task to terminal. (Acceptance gate bullets 1 full, 3.)
 
-**Scope:** Mnemosyne core + `awaiting-review` state + respawn logic. Untrusted-source tagging is Phase 2 per `architecture.md §14 Secret Sanitization` — not in scope here.
+**Scope:** Mnemosyne core + `awaiting-review` state + respawn logic. Untrusted-source tagging is Phase 2 per `architecture.md §19 Secret Sanitization` — not in scope here.
 
 ### Tasks
 
@@ -358,7 +358,7 @@ Landing D in parallel with B ensures every later slice runs under real guardrail
    - `mnemosyne/core/` — service with two surfaces:
      - Internal API for Minos: `memory.store_run(run_record)`, `memory.get_context(project_id, task_type)`
      - MCP broker for pods: `memory.lookup(query, scope)`
-   - Sanitization pass mandatory before persistence per `architecture.md §14 Secret Sanitization`
+   - Sanitization pass mandatory before persistence per `architecture.md §19 Secret Sanitization`
    - Fact-extraction pipeline: simple for Phase 1, refine in Phase 2
 
 3. **Worker plugin — memory extraction at SIGTERM**
@@ -376,7 +376,7 @@ Landing D in parallel with B ensures every later slice runs under real guardrail
    - Respawn flow: new `run_id`, same `task_id`, resolve `context_ref` via `memory.get_context`, spawn fresh pod with injected context
 
 6. **Hibernation TTLs**
-   - Reminder threshold, abandonment threshold — defaults tracked in `architecture.md §18 Open Questions`; pick concrete values during Slice C and document in config
+   - Reminder threshold, abandonment threshold — defaults tracked in `architecture.md §23 Open Questions`; pick concrete values during Slice C and document in config
 
 7. **Context injection verification**
    - Integration test: two-run task where run 2's log demonstrably references a decision from run 1
@@ -462,7 +462,7 @@ Landing D in parallel with B ensures every later slice runs under real guardrail
 ### Documentation updates during build
 
 - Whenever an implementation decision clarifies or contradicts `architecture.md`, update that doc rather than letting implementation drift.
-- Open Questions in `architecture.md §18` get resolved or re-scoped during the slice that forces the decision; track resolutions in commit messages and the affected doc.
+- Open Questions in `architecture.md §23` get resolved or re-scoped during the slice that forces the decision; track resolutions in commit messages and the affected doc.
 
 ---
 
@@ -479,9 +479,9 @@ Landing D in parallel with B ensures every later slice runs under real guardrail
 
 - **Slice A:** migration tooling choice (golang-migrate / goose / atlas)
 - **Slice B:** specific Discord slash-command shape vs. plain-text intake
-- **Slice C:** hibernation reminder/abandonment TTL defaults per `architecture.md §18`
+- **Slice C:** hibernation reminder/abandonment TTL defaults per `architecture.md §23`
 - **Slice C:** `context_ref` payload shape — inline in envelope vs. shared-volume reference, threshold for switching
-- **Slice D:** concrete budget defaults (token cap, wall-clock cap) per `architecture.md §18`
+- **Slice D:** concrete budget defaults (token cap, wall-clock cap) per `architecture.md §23`
 - **Slice E:** specific Ollama model chosen for Iris; footprint constraints on Athena
 
 ---

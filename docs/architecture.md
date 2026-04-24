@@ -412,6 +412,10 @@ Commissioning work requires an authenticated identity. Identity is a tuple `(sur
 | `task.commission.code` | Commission code/PR tasks |
 | `task.commission.infra` | Commission infrastructure tasks (task type lands in Phase 2) |
 | `task.commission.inference-tuning` | Commission inference-tuning tasks |
+| `task.commission.review` | Commission PR-review tasks (Momus, Phase 2) |
+| `task.commission.docs` | Commission documentation tasks (Clio, Phase 2) |
+| `task.commission.release` | Commission release tasks (Prometheus, Phase 2) |
+| `task.commission.adr` | Commission ADR-draft tasks (Hephaestus, Phase 2) |
 | `task.commission.research` | Commission research tasks (Pythia, Phase 3) |
 | `task.commission.test` | Commission test tasks (Talos, Phase 3) |
 | `task.direct` | Issue instructions to a running agent (surface @mention, `/daedalus direct`, PR review events) |
@@ -426,8 +430,9 @@ Commissioning work requires an authenticated identity. Identity is a tuple `(sur
 | `admin` | All capabilities |
 | `commissioner` | `task.commission.*`, `task.direct`, `task.query_state` |
 | `observer` | `task.query_state` only |
+| `system` | `task.commission.*`, `task.direct`, `task.query_state` — same baseline as `commissioner`, but provisioned at pod-deployment time (not via `/pair`), bypasses the human-pairing flow, and is used by internal pods that commission work autonomously under a persisted identity (Themis §11 is the Phase 2 reference). Revoking a `system` identity disables the pod's authority; pairing-flow steps do not apply. `identity.approve_pairing` and `identity.manage` cannot be granted to a `system` identity — identity management is human-only by design, and Minos rejects registration that attempts to attach them. |
 
-`task.commission.*` is a forward-open wildcard: commissioners pick up new task types (research and test in Phase 3) by default as each lands. Deployments that want a narrower scope remove the unwanted capability per-identity (see "Limited commissioner" below).
+`task.commission.*` is a forward-open wildcard: commissioners pick up new task types (review/docs/release/adr in Phase 2; research and test in Phase 3) by default as each lands. Deployments that want a narrower scope remove the unwanted capability per-identity (see "Limited commissioner" below).
 
 Common customizations beyond roles:
 - Reviewer identity: role `observer` plus added `task.direct` — can respond to agents and direct PR revisions, cannot commission new work
@@ -447,11 +452,11 @@ Per-project scoping (an identity's capabilities apply to specific projects only)
 
 Pairing tokens expire after a configurable window. If no admin approves in time, the pending record is deleted and the contact must re-request.
 
-**Bootstrap.** The first admin is seeded out-of-band at install time — either a config file (`/etc/minos/admins.yaml`) listing initial admin identities, or the `minos admin add <surface> <surface_id>` CLI on the Minos VM. The bootstrap source is read once at first startup and written to the identity registry; subsequent admin additions flow through the normal pairing mechanism.
+**Bootstrap.** The first admin is seeded out-of-band at install time — either a config file (`/etc/minos/admins.yaml`) listing initial admin identities, or the `minos admin add <surface> <surface_id>` CLI on the Minos VM. The bootstrap source is read once at first startup and written to the identity registry; subsequent admin additions flow through the normal pairing mechanism. `system` identities are seeded from the `system_identities` block in `deploy/config.json` (parallel to the `admin` block) on the same first-startup pass — one entry per pod class names the `(surface, surface_id)` pair and the role, Minos writes it to the registry alongside the admin bootstrap, and subsequent `system` additions are edits to that block rather than `/pair` requests.
 
-**Revocation.** An admin can revoke any identity, including another admin's. Revocation is immediate — tasks already running from the revoked identity complete on their existing trajectory but no new commissions are accepted. Minos refuses to revoke the last active admin.
+**Revocation.** An admin can revoke any identity, including another admin's. Revocation is immediate — tasks already running from the revoked identity complete on their existing trajectory but no new commissions are accepted. Minos refuses to revoke the last active admin. `system` identities carry **no** last-identity protection; revoking the only Themis identity, for example, disables autonomous backlog commissioning until a replacement is provisioned via an edit to the `system_identities` block in `deploy/config.json`. The protection exists to prevent human lock-out of the control plane — `system` identities are deployment artifacts, not reachability guarantees, so the protection does not apply.
 
-**Audit.** Every pairing request, approval, revocation, and commission is written to Ariadne. The identity registry itself lives in Minos's Postgres schema.
+**Audit.** Every pairing request, approval, revocation, and commission is written to Ariadne. Commissions carry both `origin.requester` (the commissioning identity tuple) and `origin.requester_role` (the role as of commission time) — `system`-origin commissions are distinguishable from human ones directly on the log line, with no query-time join against the identity registry required. This preserves the role-at-commission even if the identity's role changes or is revoked later, which is the state forensics actually wants after a compromised-pod incident. The identity registry itself lives in Minos's Postgres schema for operational lookup; Ariadne queries do not depend on it.
 
 **Phase 2: admin web UI.** A Phase 2 web UI exposes the identity registry, pending pairings, scope assignment, and recent activity. Same underlying state and operations; different surface for human interaction. Hosted on Minos behind whatever ingress path `security.md §2` settles on.
 
@@ -611,7 +616,7 @@ The table below groups brokers by role: external/infra first (`github`, `proxmox
 
 | Broker | Example scopes |
 |---|---|
-| `github` | `clone`, `push`, `pr.create`, `pr.update`, `pr.comment`, `issue.create`, `issue.update` |
+| `github` | `clone`, `push`, `pr.create`, `pr.update`, `pr.comment`, `issue.create`, `issue.update`. Write scopes accept path-qualified forms (e.g., `pr.create:docs/**`, `push:docs/adr/proposed/**`); the broker enforces the path filter on every call because GitHub installation tokens are repo-scoped, not path-scoped — path scoping lives at the broker, not the token. Used by Clio (§13), Prometheus (§14), Hephaestus (§15). |
 | `proxmox` | `vm.list`, `vm.status`, `vm.create`, `vm.destroy`, `vm.power.on`, `vm.power.off` |
 | `athena` | `inference.query`, `models.list`, `models.pull`, `models.load`, `sandbox.create`, `sandbox.destroy`, `corpus.refresh` |
 | `apollo` | `apollo.infer` (with per-provider/per-model sub-scopes like `apollo.anthropic.claude-*`, `apollo.openai.gpt-*`) |
@@ -636,7 +641,7 @@ The table below groups brokers by role: external/infra first (`github`, `proxmox
 
 **Rotation.** JWTs carry a 2-hour default TTL; hibernation and respawn naturally rotate them (new run = new token). Minos's signing key itself rotates on a configurable schedule; rotation invalidates all outstanding tokens simultaneously — the emergency-revocation lever. Phase 2 in-pod credential refresh (see Credential Handling above) also refreshes the MCP JWT for long-running pods.
 
-**High-blast capability confirmation.** Some scopes are classified as *high-blast* — operations with lasting external effect that would be costly to undo if wrongly invoked. Examples: `github.push` to a protected branch, `proxmox.vm.create`, `proxmox.vm.destroy`, `athena.corpus.refresh`, `athena.sandbox.create`. High-blast scopes are marked in a broker's config.
+**High-blast capability confirmation.** Some scopes are classified as *high-blast* — operations with lasting external effect that would be costly to undo if wrongly invoked. Examples: `github.push` to a protected branch, `proxmox.vm.create`, `proxmox.vm.destroy`, `athena.corpus.refresh`, `athena.sandbox.create`, production promotion via Prometheus (§14). High-blast scopes are marked in a broker's config.
 
 **Phase 1 structural backstop.** Phase 1 has no confirmation-token mechanism (JWT MCP broker auth is Phase 2, and confirmation tokens build on it). For the single high-blast scope that matters in Phase 1 — `github.push` — **GitHub branch protection on the task's base branch is the structural backstop**: a pod can push to its feature branch but cannot merge to `main` without the human-review-then-merge flow GitHub itself enforces. Minos verifies branch protection at project registration (`security.md §5`); projects without branch protection are refused in Phase 1. Other high-blast scopes (`proxmox.*`, `athena.corpus.refresh`) are not granted to any Phase 1 pod class in the first place, so the absence of confirmation tokens is not exercised. Phase 2 introduces confirmation tokens when additional pod classes and capabilities land.
 
@@ -732,7 +737,19 @@ Argus enforces a tiered response:
 
 1. **Warning** — agent is approaching a threshold. Post to the task thread. Continue.
 2. **Escalation** — agent has exceeded threshold or has not heartbeated in N minutes. Ping human on their configured surface. Pause agent.
-3. **Termination** — hard guardrail triggered (e.g., MCP broker rejects a call outside the agent's scope). Issue k3s delete with `terminationGracePeriodSeconds: 30`. The plugin receives SIGTERM and has 30 seconds to flush memory extraction before SIGKILL. Post incident to the task thread. (Phase 3 triggers a workspace volume snapshot before delete; see §21.)
+3. **Termination** — hard guardrail triggered (e.g., MCP broker rejects a call outside the agent's scope). Issue k3s delete with `terminationGracePeriodSeconds: 30`. The plugin receives SIGTERM and has 30 seconds to flush memory extraction before SIGKILL. Post incident to the task thread. (Phase 3 triggers a workspace volume snapshot before delete; see §6 Operator Break-Glass Access and `roadmap.md §Phase 3`.)
+
+### Escalation Routing
+
+**Phase 1** — Argus logic is bundled into Minos. Escalations post directly to the task thread and to the admin's configured surface. No intermediate policy layer.
+
+**Phase 2** — Argus extracts to its own service with push-event ingest, and Themis (§11) becomes the default escalation subscriber. The three-layer split:
+
+- **Argus** — detection. Watches state, emits escalation events.
+- **Themis** — policy. Classifies each escalation as halt + notify, re-plan, or escalate to human; calls Minos's task API to execute.
+- **Minos** — actuator. Kills pods, re-commissions tasks, updates task state.
+
+Admin-configured escalation classes (high-blast scope breach, repeated pod crashes, budget exhaustion) bypass Themis and go directly to the operator via Iris. The Themis policy layer is for the common case of "work needs to continue, how do we adapt"; operator interrupts are for "human judgment required now."
 
 ### Availability
 
@@ -775,7 +792,7 @@ The worker interface defines the contract every backend must implement regardles
 - Report status via the thread sidecar (dispatches to the task's configured communication surface)
 - Request human input when blocked on an ambiguous decision
 - Signal completion or failure back to Minos
-- Expose memory for extraction at pod teardown — conversation log, scratchpad, artifact references; Minos forwards the extracted record to Mnemosyne (§13)
+- Expose memory for extraction at pod teardown — conversation log, scratchpad, artifact references; Minos forwards the extracted record to Mnemosyne (§19)
 
 Pods are the correct substrate for Daedalus agents. Each pod gets its own filesystem and working directory, solving the concurrent branch checkout problem with minimal overhead. VM-per-agent is reserved for workloads that genuinely require a full OS — Windows Server tasks for worklab testing being the primary example.
 
@@ -849,7 +866,7 @@ Every pod Minos commissions receives a JSON task definition at spawn. The schema
   "project_id": "project-slug-from-registry",
   "created_at": "2026-04-20T12:00:00Z",
 
-  "task_type": "code | infra | inference-tuning | research | test",
+  "task_type": "code | infra | inference-tuning | research | test | review | docs | release | adr",
   "backend": "claude-code | qwen-coder | ...",
 
   "origin": {
@@ -916,6 +933,10 @@ Every pod Minos commissions receives a JSON task definition at spawn. The schema
 | `inference-tuning` | `model_target`, `change_description` | Completion acknowledged | 1 |
 | `research` | `query`, `depth` (shallow/deep), `output_format` (summary/citations/both) | Structured response returned via research broker | 3 |
 | `test` | `target` (`{repo, branch, commit}`), `test_suites`, `environment_spec` | Test report returned via test broker (Talos) | 3 |
+| `review` | `pr_url`, `diff_ref`, `review_scope` (style/correctness/drift/all) | Structured review comment posted to PR; Momus-generated | 2 |
+| `docs` | `target_paths` (`docs/**`, README paths), `trigger` (merged-PR / rollup / commission), `source_prs` | PR opened against `docs/**`; human merges to accept | 2 |
+| `release` | `release_ref` (git ref or range), `version_bump` (major/minor/patch/explicit), `target_environment` | Artifact published + release tagged; production promotion gated by high-blast confirmation token | 2 |
+| `adr` | `topic`, `context`, `options` (optional — if omitted, Hephaestus drafts them), `scope` (module/system/cross-cutting) | Draft ADR committed to `docs/adr/proposed/`; human PR merge promotes to `docs/adr/accepted/` | 2 |
 
 ### Schema Conventions
 
@@ -924,7 +945,7 @@ Every pod Minos commissions receives a JSON task definition at spawn. The schema
 - **Credentials:** `credentials_ref` is always an opaque name resolved by Minos's configured secret provider. Task payloads never carry inline secrets. `injected_credentials` lists secrets to populate as environment variables for direct pod use (e.g., `GITHUB_TOKEN`); `mcp_endpoints` describe brokered operations whose auth is governed by `mcp_auth_token` (JWT), not by the credential provider.
 - **Project scoping:** `project_id` binds every task to a row in the Minos project registry (§6). Minos rejects a task whose `project_id` does not resolve, and uses the registry entry to resolve GitHub credentials, the default communication surface, resource limits, and other per-project defaults at commission time.
 - **Nested dispatch:** When a task spawns a child (Daedalus → Pythia via the research broker), the child's `parent_id` points to the parent and the child's `budget` is a sub-allocation. A child's ceiling cannot exceed the parent's remaining budget.
-- **Context injection:** `context_ref` resolves against Mnemosyne (§13). Minos calls `memory.get_context` at task creation to populate this field. Null means cold start — the agent begins without prior context.
+- **Context injection:** `context_ref` resolves against Mnemosyne (§19). Minos calls `memory.get_context` at task creation to populate this field. Null means cold start — the agent begins without prior context.
 - **Schema location:** Canonical JSON Schema files live in the top-level `schemas/` directory of the repo, one file per `task_type` plus the top-level envelope. Plugin authors validate against these files directly.
 
 ### MCP Capability Composition
@@ -936,8 +957,15 @@ Minos injects a task-appropriate MCP set in the `capabilities.mcp_endpoints` fie
 | Code / PR work | GitHub (`agent/**` scope), Thread sidecar (→ Hermes) | 1 |
 | Inference tuning | Athena read surface (model status, loaded models), Thread sidecar (→ Hermes) | 1 |
 | Infrastructure change | GitHub, Proxmox API (Crete), Terraform state, Thread sidecar (→ Hermes) | 2 |
-| Research (Pythia) | Athena read surface (summarization), Charon egress (broad outbound); no Thread sidecar — responses flow through the research broker back to the caller | 3 |
+| Research (Pythia) | Athena MCP `inference.query` for summarization (broker-fronted, JWT-scoped — distinct from the direct-Ollama path local-model-backend pods use; see §11–§14), Charon egress (broad outbound); no Thread sidecar — responses flow through the research broker back to the caller | 3 |
 | Test (Talos) | GitHub (read), Proxmox API (test-environment provisioning), Thread sidecar (→ Hermes), test-environment target access | 3 |
+| Review (Momus) | GitHub (`pr.read`, `pr.comment`), Apollo (escalation tier), Mnemosyne (`memory.lookup`), Thread sidecar (→ Hermes) | 2 |
+| Docs (Clio) | GitHub (`repo.read`, `pr.create` scoped to `docs/**`), Mnemosyne (`memory.lookup`), Thread sidecar (→ Hermes) | 2 |
+| Release (Prometheus) | GitHub (release-paths scope), Proxmox API (environment promotion), artifact publisher, Thread sidecar (→ Hermes) | 2 |
+| ADR (Hephaestus) | GitHub (`repo.read`, `pr.create` scoped to `docs/adr/proposed/**` and `docs/reports/**`), Mnemosyne (`memory.lookup`), Apollo (Sonnet/Opus), Thread sidecar (→ Hermes) | 2 |
+| PM (Themis) | Minos (`query_state` via pod JWT; commission/cancel travel the identity-capability path under Themis's system identity — see §11 Authority Model), Mnemosyne (`memory.lookup`, `memory.get_context`), Argus escalation ingest, Thread sidecar (via Iris fan-out) | 2 |
+
+This table lists MCP-scoped broker reaches only. Non-MCP network reaches — direct-HTTP calls to Athena's Ollama port by local-model-backend pods, in particular — appear in the per-pod Capabilities tables in §11–§14 (Themis, Momus, Clio, Prometheus) and in §10's Pod Configuration network-reach row for Iris, plus the §16 egress rows. §15 Hephaestus has no direct-Ollama reach (Claude-tier via Apollo only); §9 Pythia reaches Athena only through the `inference.query` MCP broker path, not via direct Ollama. §16 is the canonical "what reaches what" surface if the two ever disagree.
 
 ### Trust Boundary and Untrusted Content
 
@@ -951,7 +979,7 @@ Daedalus draws a strict trust boundary:
 |---|---|---|
 | System prompt (plugin-provided) | Trusted | Authored by the project owner, loaded at pod spawn |
 | Task envelope (`brief`, `inputs`, `capabilities`) | Trusted | Signed by Minos, verified by plugin on load |
-| Context blob from Mnemosyne (`context_ref`) | Trusted (Phase 2+ with untrusted-source tagging preserved across runs; see §14) | Sanitized on persistence; retrieved through Mnemosyne's internal API which only Minos calls. Phase 1 lacks untrusted-source tagging and therefore surfaces prior-run content without trust distinction — accepted Phase 1 risk per §14. |
+| Context blob from Mnemosyne (`context_ref`) | Trusted (Phase 2+ with untrusted-source tagging preserved across runs; see §19) | Sanitized on persistence; retrieved through Mnemosyne's internal API which only Minos calls. Phase 1 lacks untrusted-source tagging and therefore surfaces prior-run content without trust distinction — accepted Phase 1 risk per §19. |
 | Reviewer comments and pending review feedback on respawn | **Untrusted** | Attacker-influenceable via outside-contributor PRs or compromised reviewer accounts; delivered to the respawned pod as untrusted-read content, never as part of `brief` or `inputs` |
 | Anything read during execution — files, git history, PR/issue text, tool output, research results | **Untrusted** | May contain attacker-authored content, even on repos you control, because outside contributors open PRs, commit to branches, file issues |
 
@@ -978,6 +1006,8 @@ Exposed operations:
 
 **Argus sidecar** — emits a periodic heartbeat to the Argus event ingest endpoint independent of the agent's own activity. Runs as a separate container so that a hung or compromised worker backend cannot suppress it. The heartbeat is the primary stall-detection signal for Argus.
 
+**Default for all pod classes.** The two sidecars, the trust-boundary contract, and the per-backend translation responsibility described above are the **default contract for every worker-backend pod class in Daedalus** — Iris (§10), Themis (§11), Momus (§12), Clio (§13), Prometheus (§14), Hephaestus (§15), Pythia (§9), Talos, Minotaur, and Typhon all inherit this shape unless their own section explicitly deviates. Sections that deviate call it out explicitly: Pythia (§9) replaces the thread sidecar with research-broker response flow; Iris (§10) has no Argus sidecar in Phase 1 (§10 Phase 1 stall gap). No other pod class should be read as silently opting out — if its section is silent on sidecars, the §8 default applies.
+
 ---
 
 ## 9. Pythia — Research Pods
@@ -997,7 +1027,7 @@ The interaction pattern is request/response. A Daedalus agent invokes a research
 | Internet egress | Proxmox firewall allowlist (GitHub, package registries, internal services including Hermes, Athena, Argus, Ariadne) | Broad outbound HTTPS (via Charon in Phase 2) |
 | GitHub write | Yes (`agent/**` scope) | No |
 | Filesystem persistence | Ephemeral workspace within the pod | Ephemeral scratch; no external write |
-| MCP capabilities | Task-appropriate set (Code/PR, Infra, etc.) | Athena read surface for summarization; local file scratch |
+| MCP capabilities | Task-appropriate set (Code/PR, Infra, etc.) | Athena MCP `inference.query` for summarization (broker-fronted, JWT-scoped — distinct from the direct-Ollama path local-model-backend pods use; see §11–§14); local file scratch |
 | Invoked by | Human via Minos intake | Daedalus agent via research MCP broker |
 
 ### Lifecycle
@@ -1042,7 +1072,7 @@ The content block is always bracketed by unambiguous untrusted-content markers. 
 
 **Phase 2 additions:**
 - **Content filter** — Pythia runs a lightweight LLM-based filter on fetched content to flag prompt-injection patterns (instruction-shaped sequences, attempts to break out of quotation, etc.) before returning. Filter results are metadata; the content still flows through, flagged
-- **Per-task domain allowlist** — task.inputs.domain_allowlist narrows Pythia's egress to declared domains for this specific research query; Charon enforces (see §11)
+- **Per-task domain allowlist** — task.inputs.domain_allowlist narrows Pythia's egress to declared domains for this specific research query; Charon enforces (see §16)
 
 ---
 
@@ -1135,6 +1165,7 @@ When the identity registry and capability model land in Phase 2, Iris's surface 
 - Delegated actions available to any user whose capabilities permit them (not just the admin)
 - Break-glass session issuance for observe-level access when the user has `break_glass.observe`
 - Argus threshold tuning, Hermes configuration, Cerberus route changes as Minos's admin API grows
+- **Themis hand-off** — backlog planning and cross-pod coordination move from Iris to Themis (§11). Iris remains the conversational surface; Themis owns the plan. Multi-task NL requests that Iris would have sequenced in Phase 1 are forwarded to Themis, which decomposes, commissions, and reports progress back through Iris for display.
 
 ### Phase 3+ Scope
 
@@ -1183,7 +1214,7 @@ Themis is load-bearing once the pod fleet is non-trivial. Without it, Iris must 
 | Internet egress | None (internal only) |
 | GitHub write | No (reads issue trackers and PR state only) |
 | Filesystem persistence | Ephemeral scratch; durable state lives in Minos's task registry and Mnemosyne |
-| MCP capabilities | Minos task API (commission, state query, cancel), Mnemosyne (`memory.lookup`, `memory.get_context`), Hermes (post-only via Iris fan-out; Themis does not chat directly), Argus escalation ingest |
+| MCP capabilities | Minos (`query_state` via pod JWT; commission/cancel travel the identity-capability path under Themis's system identity — see Authority Model below), Mnemosyne (`memory.lookup`, `memory.get_context`), Hermes (post-only via Iris fan-out; Themis does not chat directly), Argus escalation ingest, Athena Ollama inference (direct HTTP, not MCP-scoped) for the local-model backend |
 | Invoked by | Iris (on operator request), Argus (on guardrail escalation), scheduled rollup |
 
 ### Lifecycle
@@ -1209,6 +1240,12 @@ Argus escalations route to Themis (Phase 2 extracts Argus as a service with push
 
 Argus is the detection layer. Themis is the policy layer. Minos is the actuator.
 
+### Authority Model
+
+Themis commissions work and cancels runs autonomously — on operator hand-off from Iris, on scheduled rollups, and on Argus re-plan escalations. §6 MCP Broker Authentication states that commissions travel the *identity-capability* path rather than a pod-JWT scope; Themis fits that rule by having a **persisted system identity** in the Phase 2 identity registry rather than acting under a user-on-behalf-of token. The Themis identity uses the `system` role from §6 (baseline: `task.commission.*`, `task.direct`, `task.query_state`) and is provisioned at pod-deployment time rather than through `/pair`. Minos treats calls from the Themis pod the same way it treats calls from any other identity — authenticated, authorized per-capability, audited to Ariadne with the Themis identity as `origin.requester`.
+
+This keeps the `minos` broker scope table (§6) simple — no pod-JWT `minos.task.commission` scope is needed — while still giving Themis a real authority trail. A compromised Themis can only commission what its identity is authorized for; revoking the Themis identity in the registry is the emergency shutoff. Bootstrap mechanics, revocation semantics (including the deliberate absence of last-identity protection), and the `identity.*`-capability restriction for `system` identities are all specified in §6. The identity-tuple slot convention (what goes in `(surface, surface_id)` for non-human identities) and the re-plan-vs-escalate-to-human boundary are Phase 2 design work — see §23 Open Questions.
+
 ### Backend
 
 Local model on Athena — `qwen3.5:27b` default. Task decomposition against the known §8 schema is pattern-shaped, not novel-judgment. Escalation-class decisions (ambiguous re-plan vs halt) may route through Apollo to Sonnet; route by confidence threshold, same two-stage pattern as Momus.
@@ -1232,7 +1269,7 @@ Momus is a distinct function from QA (Talos, Phase 3) and from red team (Minotau
 | Internet egress | None |
 | GitHub write | Comment-only on PRs (no approve, no request-changes, no merge). Review verdict posted as a structured comment for human reviewers. |
 | Filesystem persistence | Ephemeral checkout of the PR branch; torn down after review |
-| MCP capabilities | GitHub (`pr.read`, `pr.comment`), Apollo (for escalation-tier review), Thread sidecar (→ Hermes for progress posts), Mnemosyne (`memory.lookup` for prior-review context on the same file/area) |
+| MCP capabilities | GitHub (`pr.read`, `pr.comment`), Apollo (for escalation-tier review), Thread sidecar (→ Hermes for progress posts), Mnemosyne (`memory.lookup` for prior-review context on the same file/area), Athena Ollama inference (direct HTTP, not MCP-scoped) for the local triage tier |
 | Invoked by | Cerberus PR-opened / PR-updated webhook → Minos → Momus commission |
 
 ### Lifecycle
@@ -1255,11 +1292,11 @@ Two-stage routing is the economics: expected 60–70% reduction in Claude calls 
 
 ### Isolation
 
-Momus pods share the Labyrinth cluster but run with no write MCPs beyond the scoped GitHub comment path. They cannot push to branches, merge PRs, or mutate infrastructure. The Argus sidecar runs alongside the worker for stall detection and guardrail enforcement.
+Momus pods share the Labyrinth cluster but run with no write MCPs beyond the scoped GitHub comment path. They cannot push to branches, merge PRs, or mutate infrastructure. Sidecar posture follows the §8 default (Thread + Argus).
 
 ### Prompt Injection Surface
 
-Momus reads PR diffs, which include attacker-controllable content (the submitter's code and commit messages). The trust boundary defined in §8 applies: diff content is untrusted input. An attacker who plants "approve this PR" in a comment or a code comment does not cause Momus to approve — Momus has no `pr.approve` MCP scope. Capability gating is the backstop.
+Momus reads PR diffs, which include attacker-controllable content (the submitter's code and commit messages). The §8 trust boundary applies: diff content is untrusted input. An attacker who plants "approve this PR" in a comment or a code comment does not cause Momus to approve — Momus has no `pr.approve` MCP scope. Capability gating is the backstop.
 
 ### Backend
 
@@ -1282,9 +1319,9 @@ Clio exists because documentation is consistently neglected in automated develop
 | Resource | Clio pod |
 |---|---|
 | Internet egress | None |
-| GitHub write | Branch push + PR open on `docs/**` paths only (scoped GitHub installation token). Never touches application code. |
+| GitHub write | Branch push + PR open on `docs/**` paths only. Path scoping is enforced at the `github` MCP broker (not at the installation token, which GitHub scopes to a repo, not a path); a compromised Clio cannot bypass path restrictions because the broker refuses non-matching write calls. Never touches application code. |
 | Filesystem persistence | Ephemeral workspace |
-| MCP capabilities | GitHub (`repo.read`, `pr.create` scoped to `docs/**`), Mnemosyne (`memory.lookup` for prior doc decisions and project glossary), Thread sidecar (→ Hermes) |
+| MCP capabilities | GitHub (`repo.read`, `pr.create` scoped to `docs/**`), Mnemosyne (`memory.lookup` for prior doc decisions and project glossary), Thread sidecar (→ Hermes), Athena Ollama inference (direct HTTP, not MCP-scoped) for the local-model backend |
 | Invoked by | Themis on merged-PR events, scheduled rollup for changelog maintenance, direct operator commission for one-off doc work |
 
 ### Lifecycle
@@ -1296,7 +1333,7 @@ Two modes:
 
 ### Isolation
 
-Clio's GitHub scope is intentionally narrow: `docs/**` paths only. This is enforced at the GitHub App installation token scope at commission time, not left to the agent's discretion. A compromised or injected Clio cannot modify application code or infra — it can only produce doc PRs that then go through human review on the same branch-protection path.
+Clio's GitHub scope is intentionally narrow: `docs/**` paths only. Path scoping is enforced at the `github` MCP broker at call time, not at the installation token (GitHub scopes tokens to repos, not paths); the broker refuses writes outside the declared path list regardless of the token's repo permissions. A compromised or injected Clio cannot modify application code or infra — the broker rejects non-matching writes, and doc PRs still go through human review on the same branch-protection path.
 
 ### Backend
 
@@ -1317,9 +1354,9 @@ Prometheus owns release engineering: pipeline configuration, environment promoti
 | Resource | Prometheus pod |
 |---|---|
 | Internet egress | Package registries, container registries, artifact destinations (per project-registry allowlist) |
-| GitHub write | Yes, scoped to CI config paths (`.github/workflows/**`, `ci/**`, `release/**`) and version files (`VERSION`, `package.json` version bumps, etc.) |
+| GitHub write | Yes, scoped to CI config paths (`.github/workflows/**`, `ci/**`, `release/**`) and version files (`VERSION`, `package.json` version bumps, etc.). Path scoping is enforced at the `github` MCP broker, not at the installation token. |
 | Filesystem persistence | Ephemeral workspace with registry-cache mount |
-| MCP capabilities | GitHub (`repo.read`, `pr.create` scoped to release paths), Proxmox API (environment provisioning for staging/prod promotion — Phase 2), artifact publisher, Thread sidecar (→ Hermes) |
+| MCP capabilities | GitHub (`repo.read`, `pr.create` scoped to release paths), Proxmox API (environment provisioning for staging/prod promotion — Phase 2), artifact publisher, Thread sidecar (→ Hermes), Athena Ollama inference (direct HTTP, not MCP-scoped) for the local-model backend |
 | Invoked by | Themis on release-eligible events (main-branch merge with semver-bump label, scheduled releases), direct operator commission |
 
 ### Lifecycle
@@ -1362,14 +1399,14 @@ Hephaestus produces **draft artifacts only**, committed to one of three well-kno
 - `docs/reports/coupling/<timestamp>.md` — coupling and structural reports
 - `docs/reports/topology/<timestamp>.svg` / `.md` — topology visualizations
 
-Promotion to `docs/adr/accepted/` happens only via a human PR merge. Hephaestus has no MCP scope that can create `docs/adr/accepted/**` files directly. Branch protection on `docs/adr/accepted/**` is the structural enforcement; Hephaestus's GitHub App installation token is scoped away from that path.
+Promotion to `docs/adr/accepted/` happens only via a human PR merge. Hephaestus has no MCP scope that can create `docs/adr/accepted/**` files directly. Branch protection on `docs/adr/accepted/**` is the structural enforcement; the `github` MCP broker enforces path scoping on Hephaestus's writes (installation tokens are repo-scoped by GitHub, not path-scoped — the broker is where the draft-only invariant actually lives).
 
 ### Capabilities
 
 | Resource | Hephaestus pod |
 |---|---|
 | Internet egress | None (reads the repo and Mnemosyne only) |
-| GitHub write | PR-open scoped to `docs/adr/proposed/**`, `docs/reports/**` |
+| GitHub write | PR-open scoped to `docs/adr/proposed/**`, `docs/reports/**`. Path scoping is enforced at the `github` MCP broker, not at the installation token. |
 | Filesystem persistence | Ephemeral workspace |
 | MCP capabilities | GitHub (repo.read, pr.create scoped to draft paths), Mnemosyne (`memory.lookup`), Apollo (Sonnet default, Opus for ambiguous structural decisions), Thread sidecar (→ Hermes) |
 | Invoked by | Themis on design-decision triggers (significant refactor tasks, cross-module dependency changes), direct operator commission for ad-hoc structural review |
@@ -1422,7 +1459,7 @@ Crete-level CPU budget: the i9-13900H provides 14 cores / 20 threads. Phase 1 Da
 
 ### Network Isolation
 
-**Phase:** Phase 1 ships with the default k3s CNI (flannel) and Proxmox-vNIC + Labyrinth-host-firewall layering only. NetworkPolicy-based per-pod-class enforcement and default-deny pod-to-pod are **Phase 3**, landing alongside Pythia/Talos/Minotaur when multiple pod classes make the discriminator useful.
+**Phase:** Phase 1 ships with the default k3s CNI (flannel) and Proxmox-vNIC + Labyrinth-host-firewall layering only. NetworkPolicy-based per-pod-class enforcement and default-deny pod-to-pod are **Phase 3**, landing alongside Pythia/Talos/Minotaur/Typhon when multiple pod classes make the discriminator useful.
 
 Labyrinth pods may reach the following destinations and no others: Athena inference ports; GitHub over HTTPS; the Anthropic API over HTTPS (Phase 1 — claude-code pods call Anthropic directly; Phase 2 collapses this to "Apollo broker only" once Apollo lands and holds the credential); the Hermes broker on the Minos VM (for thread operations); the Minos state API and Argus ingest endpoint on the Minos VM; the Ariadne log ingest endpoint on the Ariadne VM.
 
@@ -1441,15 +1478,21 @@ Phase 3 adds a third layer:
 
 **Phase 3:** pod-to-pod traffic becomes **default-deny** under Calico — the first phase in which intra-VM pod-to-pod gets any enforcement at all. The broker-mediated coordination pattern (Daedalus → research broker → Pythia, never direct pod-to-pod) makes default-deny the natural fit — there is no legitimate cross-pod traffic flow in normal operation.
 
-NetworkPolicies are organized by pod class, selected via labels (`daedalus.project/pod-class: daedalus | iris | pythia | talos | minotaur`):
+NetworkPolicies are organized by pod class, selected via labels (`daedalus.project/pod-class: daedalus | iris | themis | momus | clio | prometheus | hephaestus | pythia | talos | minotaur | typhon`):
 
 | Pod class | Egress allowed to |
 |---|---|
 | Daedalus | Minos VM (Hermes, Argus ingest, MCP brokers), Ariadne (log ingest), Athena (inference ports), external via Charon |
 | Iris | Minos VM (state API, Hermes), Ariadne (query), Athena (Ollama inference) |
+| Themis | Minos VM (task API, Mnemosyne, Argus ingest, Hermes via Iris fan-out), Ariadne, Athena (Ollama inference) |
+| Momus | Minos VM (GitHub broker, Apollo broker, Mnemosyne, Hermes, Argus ingest), Ariadne, Athena (Ollama inference for local triage tier); no direct external egress |
+| Clio | Minos VM (GitHub broker, Mnemosyne, Hermes, Argus ingest), Ariadne, Athena (Ollama inference); no direct external egress |
+| Prometheus | Minos VM (GitHub broker, Proxmox broker, Hermes, Argus ingest), Ariadne, Athena (Ollama inference), external artifact destinations via Charon |
+| Hephaestus | Minos VM (GitHub broker, Apollo broker, Mnemosyne, Hermes, Argus ingest), Ariadne; no direct external egress (Claude-tier inference goes through Apollo) |
 | Pythia | Minos VM (Argus ingest, research-broker response), Ariadne, Athena (inference only), external via Charon (broad allowlist with denylist + per-task domain narrowing) |
 | Talos | Superset of Daedalus plus test-environment targets (Proxmox MCP for VM provisioning; test-environment IPs) |
 | Minotaur | Minos VM (Argus ingest), Ariadne; no external egress |
+| Typhon | Minos VM (Argus ingest), Ariadne; no external egress (internal-only for now; scope may expand when the chaos-target surface is defined) |
 
 No pod class's default egress list includes another pod — all cross-pod coordination flows through brokers on the Minos VM, which already authenticate and authorize via the JWT + MCP broker pattern (Phase 2).
 
@@ -1801,7 +1844,7 @@ Sections in this document carry **Phase** banners where their content varies by 
 
 The following must be fully designed and implemented before Daedalus Phase 1 can be considered operational. These are hard blockers for the MVP OpenClaw-replacement milestone in `roadmap.md §Phase 1`.
 
-**Context injection and memory readout** — Addressed architecturally by Mnemosyne (§14). Remaining implementation work: the run-record schema (conversation log format, scratchpad dump, artifact references), the fact-extraction pipeline (how learned facts are distilled from run records into the semantic index), and the context-assembly strategy (what gets pulled into `context_ref` for a new task). Phase 1 ships with a simple extraction pipeline; Phase 2 refines.
+**Context injection and memory readout** — Addressed architecturally by Mnemosyne (§19). Remaining implementation work: the run-record schema (conversation log format, scratchpad dump, artifact references), the fact-extraction pipeline (how learned facts are distilled from run records into the semantic index), and the context-assembly strategy (what gets pulled into `context_ref` for a new task). Phase 1 ships with a simple extraction pipeline; Phase 2 refines.
 
 **Plugin architecture and worker backend abstraction** — Phase 1 ships exactly one worker backend (the `claude-code` binary), but the plugin interface must be defined now so future backends slot in without unpicking tight coupling. The task definition schema (§8) specifies the dispatch-side contract; §8 Daedalus Agents describes the reciprocal runtime interface at a high level (status reporting, human-input requests, completion signaling, memory extraction). Remaining implementation work is codifying exact API signatures and the thread-sidecar-unavailable fallback behavior that the "Thread sidecar failure mode" blocker below depends on.
 
@@ -1834,6 +1877,7 @@ The following must be fully designed and implemented before Daedalus Phase 1 can
 **Phase 2+:**
 
 - Pairing token expiration window, number of admin approvals required (single vs quorum), and whether `/pair` is rate-limited per source IP
+- `system` identity-tuple convention (Phase 2): what goes in the `(surface, surface_id)` slots for non-human identities — e.g., `(pod-class, themis)` vs `(system, themis)` vs something fully synthetic. §6 commits to "`(surface, surface_id)` shape" for consistency with the human-identity registry; the specific slot convention is Phase 2 design work (§11 Authority Model)
 - Argus threshold configuration: per-project, per-agent-type, or global (once Argus extracts as a service)
 - Cerberus replay-window default length (how long delivery IDs are retained against replay)
 - Whether Cerberus audit logs include request bodies or metadata only (privacy/compliance consideration)
@@ -1842,6 +1886,7 @@ The following must be fully designed and implemented before Daedalus Phase 1 can
 - Talos capability scope (Phase 3): whether Talos pods provision full test environments (VMs via Proxmox MCP) or only run test suites in containers; how test environment lifecycle relates to the originating Daedalus agent's PR
 - Dispatch queue (Phase 3): Pythia dispatch timeout default and per-class age-out policy for automated-trigger tasks that sit too long
 - Surface message replay on recovery (Phase 2+): per-surface inbound history fetch depth, timestamped replay format delivered to running pods, and the plugin-interface contract for how an agent reconciles replayed messages against in-progress work (re-plan vs. continue vs. `request_human_input`)
+- Budget defaults per Phase 2 task type (`review`, `docs`, `release`, `adr`): per-type `max_tokens`, `max_wall_clock_seconds`, and Argus warning/escalation thresholds. Review and docs are expected to be short and bounded; release and ADR drafts can run long. Defaults pending operational data from Momus/Clio/Prometheus/Hephaestus under real load.
 
 ---
 
