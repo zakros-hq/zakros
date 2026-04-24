@@ -111,7 +111,40 @@ TL;DR:
 4. Paste the webhook secret into `deploy/secrets.json` under
    `cerberus/github-webhook`, re-run `deploy/minos-install.sh`
 
-## 7. End-to-end smoke test
+## 7. Worker pod credentials (Anthropic + GitHub)
+
+The claude-code worker image consumes two credentials at runtime:
+
+- `CLAUDE_CODE_OAUTH_TOKEN` — long-lived Claude Code token so pods bill
+  against your Claude.ai subscription (Max / Pro / Teams) instead of
+  metered API spend. Generate once on your workstation:
+
+  ```sh
+  claude setup-token
+  ```
+
+  Paste the emitted token into `deploy/secrets.json` →
+  `claude-code/oauth-token.value`. Token is good for ~1 year; re-run
+  to rotate.
+
+- `GITHUB_TOKEN` — GitHub PAT for `gh pr create` + git push from the
+  worker pod. Phase 1 uses a **fine-grained PAT** scoped to the
+  test repo; Phase 2 will mint short-lived installation tokens via
+  the GitHub App.
+
+  GitHub → Settings → Developer settings → Personal access tokens →
+  Fine-grained tokens → Generate new token. Permissions: Contents
+  read/write, Pull requests read/write, Metadata read. Scope to the
+  repos you want Daedalus to commit to.
+
+  Paste into `deploy/secrets.json` → `github/pat.value`.
+
+Both wire through `project.capabilities.injected_credentials` in
+`config.json`; the template already maps them to the expected env vars
+that claude-code + gh read automatically. Re-run
+`deploy/minos-install.sh` after editing.
+
+## 8. End-to-end smoke test
 
 1. `/status` in Discord → minos should respond with operational summary
 2. `/commission "echo hello"` → pod spawns on labyrinth, runs entrypoint,

@@ -30,7 +30,16 @@
     },
     "thread_parent": "REPLACE_DISCORD_CHANNEL_ID",
     "capabilities": {
-      "injected_credentials": [],
+      "injected_credentials": [
+        {
+          "env_var": "CLAUDE_CODE_OAUTH_TOKEN",
+          "credentials_ref": "claude-code/oauth-token"
+        },
+        {
+          "env_var": "GITHUB_TOKEN",
+          "credentials_ref": "github/pat"
+        }
+      ],
       "mcp_endpoints": []
     }
   },
