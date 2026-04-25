@@ -111,6 +111,7 @@ func (s *Server) handleHermesEventsNext(w http.ResponseWriter, r *http.Request) 
 	if events == nil {
 		events = []hermescore.PullEvent{}
 	}
+	w.Header().Set("X-Hermes-Instance", s.hermes.InstanceID())
 	writeJSON(w, http.StatusOK, events)
 }
 

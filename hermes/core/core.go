@@ -13,6 +13,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 // ErrNoPlugin is returned when a caller references a surface for which no
@@ -88,11 +90,23 @@ type Broker struct {
 	plugins        map[string]Plugin
 	handlers       []InboundHandler
 	pullConsumers  map[string]*pullConsumer
+	instanceID     string
 }
 
 // New returns an empty Broker ready to accept plugin registrations.
 func New() *Broker {
-	return &Broker{plugins: map[string]Plugin{}}
+	return &Broker{
+		plugins:    map[string]Plugin{},
+		instanceID: uuid.NewString(),
+	}
+}
+
+// InstanceID returns the broker's startup-unique identifier. Pull
+// consumers compare it across responses to detect a broker restart
+// and reset their cursor when the in-memory pull buffer has been
+// recreated from scratch (Phase 1 posture: no persisted buffer).
+func (b *Broker) InstanceID() string {
+	return b.instanceID
 }
 
 // RegisterPlugin adds a plugin keyed by its Name. Calling twice with the

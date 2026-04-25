@@ -47,12 +47,13 @@ func (p *Poller) Run(ctx context.Context) error {
 	}
 
 	logger.Info("iris poller starting", "timeout", timeout, "max_batch", maxBatch)
+	var lastInstance string
 	for {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
 
-		events, err := p.Hermes.EventsNext(ctx, since, maxBatch, timeout)
+		events, instance, err := p.Hermes.EventsNext(ctx, since, maxBatch, timeout)
 		if err != nil {
 			if errors.Is(err, context.Canceled) {
 				return ctx.Err()
@@ -65,6 +66,20 @@ func (p *Poller) Run(ctx context.Context) error {
 				return ctx.Err()
 			}
 			continue
+		}
+
+		// Detect broker restart: Hermes's pull buffer is in-memory (Phase 1
+		// posture per hermes/core/pull.go), so its seq counter resets when
+		// Minos restarts. Without this check, our `since` cursor stays
+		// stale and Hermes silently filters out the first N post-restart
+		// messages until the new seq overtakes our cursor.
+		if instance != "" && lastInstance != "" && instance != lastInstance {
+			logger.Info("hermes broker restart detected — resetting cursor",
+				"prev_instance", lastInstance, "new_instance", instance, "prev_since", since)
+			since = 0
+		}
+		if instance != "" {
+			lastInstance = instance
 		}
 
 		for _, ev := range events {

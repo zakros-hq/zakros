@@ -45,9 +45,10 @@ type PullEvent struct {
 
 // EventsNext long-polls the Iris pull buffer. since is the highest Seq
 // the caller has processed; max bounds the response; timeout (seconds)
-// is the long-poll budget. Returns []PullEvent (possibly empty) or
-// ctx.Err() when ctx cancels.
-func (c *HermesClient) EventsNext(ctx context.Context, since uint64, maxEvents, timeoutSec int) ([]PullEvent, error) {
+// is the long-poll budget. Returns the events plus the broker's instance
+// ID (from the X-Hermes-Instance header) so the caller can detect a
+// broker restart and reset its cursor.
+func (c *HermesClient) EventsNext(ctx context.Context, since uint64, maxEvents, timeoutSec int) ([]PullEvent, string, error) {
 	q := url.Values{}
 	if since > 0 {
 		q.Set("since", fmt.Sprintf("%d", since))
@@ -61,22 +62,23 @@ func (c *HermesClient) EventsNext(ctx context.Context, since uint64, maxEvents, 
 	req, err := http.NewRequestWithContext(ctx, "GET",
 		c.BaseURL+"/hermes/events.next?"+q.Encode(), nil)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	req.Header.Set("Authorization", "Bearer "+c.IrisToken)
 	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("events.next: %s: %s", resp.Status, readSnippet(resp.Body))
+		return nil, "", fmt.Errorf("events.next: %s: %s", resp.Status, readSnippet(resp.Body))
 	}
+	instance := resp.Header.Get("X-Hermes-Instance")
 	var events []PullEvent
 	if err := json.NewDecoder(resp.Body).Decode(&events); err != nil {
-		return nil, fmt.Errorf("events.next decode: %w", err)
+		return nil, instance, fmt.Errorf("events.next decode: %w", err)
 	}
-	return events, nil
+	return events, instance, nil
 }
 
 // PostAsIris posts a reply to a thread on Iris's behalf. The Phase 2
