@@ -2,7 +2,7 @@
 # put here — load them from TF_VAR_* environment variables in your shell:
 #
 #   export TF_VAR_proxmox_endpoint="https://172.16.30.103:8006/"
-#   export TF_VAR_proxmox_api_token='terraform@pve!daedalus=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
+#   export TF_VAR_proxmox_api_token='terraform@pve!zakros=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
 #
 # Generate an OPNsense API key pair once and stash in your password
 # manager or Infisical:
@@ -75,7 +75,7 @@ image_datastore   = "local"
 proxmox_ssh_host = "172.16.30.103"
 
 # --- Network ---
-# A VLAN-aware Proxmox bridge with NO physical uplink hosts the Daedalus
+# A VLAN-aware Proxmox bridge with NO physical uplink hosts the Zakros
 # SDN zone. Create it once on Crete:
 #   auto vmbr1
 #   iface vmbr1 inet manual
@@ -89,18 +89,18 @@ proxmox_ssh_host = "172.16.30.103"
 wan_bridge      = "vmbr0"
 internal_bridge = "vmbr1"
 
-sdn_zone         = "daedalus"
+sdn_zone         = "zakros"
 sdn_vnet         = "daedalan"
-daedalus_vlan_id = 200
-daedalus_subnet  = "10.100.0.0/24"
+zakros_vlan_id = 200
+zakros_subnet  = "10.100.0.0/24"
 
 dns_servers = ["1.1.1.1", "9.9.9.9"]
 
 # --- Cloud-init defaults ---
 ssh_public_key_path = "~/.ssh/id_ed25519.pub"
-admin_username      = "daedalus"
+admin_username      = "zakros"
 timezone            = "America/Chicago"
-domain_suffix       = "daedalus.local"
+domain_suffix       = "zakros.local"
 
 # --- OPNsense firewall ---
 # First apply:

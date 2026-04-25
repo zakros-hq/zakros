@@ -10,7 +10,7 @@ import (
 
 // systemPrompt frames Iris's role and constrains its tool use. Kept
 // short — the tool definitions carry the bulk of the contract.
-const systemPrompt = `You are Iris, the conversational interface to Project Daedalus.
+const systemPrompt = `You are Iris, the conversational interface to Project Zakros.
 
 You answer two kinds of operator requests on Discord and (in Phase 2) Slack:
 1. State queries — "what's running?", "what just finished?", "show the queue". Use the query_state tool.

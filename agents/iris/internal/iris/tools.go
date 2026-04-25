@@ -43,7 +43,7 @@ func (ts *ToolSet) Definitions() []Tool {
 	return []Tool{
 		{
 			Name:        "query_state",
-			Description: "List Daedalus tasks by state. Use this to answer 'what's running?', 'what's queued?', or 'what just finished?'.",
+			Description: "List Zakros tasks by state. Use this to answer 'what's running?', 'what's queued?', or 'what just finished?'.",
 			InputSchema: map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -61,7 +61,7 @@ func (ts *ToolSet) Definitions() []Tool {
 		},
 		{
 			Name:        "commission",
-			Description: "Commission a new Daedalus task. Use this when the operator asks Iris to start work on something.",
+			Description: "Commission a new Zakros task. Use this when the operator asks Iris to start work on something.",
 			InputSchema: map[string]any{
 				"type": "object",
 				"properties": map[string]any{

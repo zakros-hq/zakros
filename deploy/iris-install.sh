@@ -5,18 +5,18 @@
 #
 # Prerequisites on the operator side:
 #   * deploy/config.json + deploy/secrets.json populated
-#   * Operator has run deploy/images-push.sh so daedalus/iris:local
+#   * Operator has run deploy/images-push.sh so zakros/iris:local
 #     is in labyrinth's containerd
-#   * ~/.kube/daedalus.yaml — the labyrinth kubeconfig
+#   * ~/.kube/zakros.yaml — the labyrinth kubeconfig
 #
 # Env:
 #   IMAGE_TAG       default local
-#   KUBECONFIG_SRC  default ~/.kube/daedalus.yaml
+#   KUBECONFIG_SRC  default ~/.kube/zakros.yaml
 
 set -euo pipefail
 
 : "${IMAGE_TAG:=local}"
-: "${KUBECONFIG_SRC:=$HOME/.kube/daedalus.yaml}"
+: "${KUBECONFIG_SRC:=$HOME/.kube/zakros.yaml}"
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT"
@@ -98,14 +98,14 @@ sed \
   -e "s|REPLACE_MINOS_URL|${MINOS_URL}|g" \
   -e "s|REPLACE_PROJECT_ID|${PROJECT_ID}|g" \
   -e "s|REPLACE_DEFAULT_REPO_URL|${DEFAULT_REPO}|g" \
-  -e "s|daedalus/iris:local|daedalus/iris:${IMAGE_TAG}|g" \
+  -e "s|zakros/iris:local|zakros/iris:${IMAGE_TAG}|g" \
   deploy/templates/iris-deployment.yaml > "$TMP"
 
 echo "==> Applying to labyrinth"
 KUBECONFIG="${KUBECONFIG_SRC}" kubectl apply -f "$TMP"
 
 echo "==> Waiting for Iris pod to become ready (60s)"
-KUBECONFIG="${KUBECONFIG_SRC}" kubectl -n daedalus rollout status deploy/iris --timeout=60s || true
+KUBECONFIG="${KUBECONFIG_SRC}" kubectl -n zakros rollout status deploy/iris --timeout=60s || true
 
 echo "==> Tail logs with:"
-echo "    KUBECONFIG=${KUBECONFIG_SRC} kubectl -n daedalus logs -f deploy/iris"
+echo "    KUBECONFIG=${KUBECONFIG_SRC} kubectl -n zakros logs -f deploy/iris"

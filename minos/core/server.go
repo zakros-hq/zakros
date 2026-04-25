@@ -11,14 +11,14 @@ import (
 	"net/http"
 	"time"
 
-	ghverify "github.com/GoodOlClint/daedalus/cerberus/verification/github"
-	hermescore "github.com/GoodOlClint/daedalus/hermes/core"
-	mnemocore "github.com/GoodOlClint/daedalus/mnemosyne/core"
-	"github.com/GoodOlClint/daedalus/minos/argus"
-	"github.com/GoodOlClint/daedalus/minos/dispatch"
-	"github.com/GoodOlClint/daedalus/minos/storage"
-	"github.com/GoodOlClint/daedalus/pkg/audit"
-	"github.com/GoodOlClint/daedalus/pkg/provider"
+	ghverify "github.com/zakros-hq/zakros/cerberus/verification/github"
+	hermescore "github.com/zakros-hq/zakros/hermes/core"
+	mnemocore "github.com/zakros-hq/zakros/mnemosyne/core"
+	"github.com/zakros-hq/zakros/minos/argus"
+	"github.com/zakros-hq/zakros/minos/dispatch"
+	"github.com/zakros-hq/zakros/minos/storage"
+	"github.com/zakros-hq/zakros/pkg/audit"
+	"github.com/zakros-hq/zakros/pkg/provider"
 )
 
 // Server is the Minos core service instance.
@@ -45,7 +45,7 @@ func WithClock(now func() time.Time) Option {
 }
 
 // WithNamespace overrides the Kubernetes namespace used for dispatched pods.
-// Default is "daedalus".
+// Default is "zakros".
 func WithNamespace(ns string) Option {
 	return func(s *Server) { s.namespace = ns }
 }
@@ -103,7 +103,7 @@ func New(cfg Config, p provider.Provider, store storage.Store, d dispatch.Dispat
 		store:      store,
 		dispatcher: d,
 		audit:      em,
-		namespace:  "daedalus",
+		namespace:  "zakros",
 		now:        func() time.Time { return time.Now().UTC() },
 	}
 	for _, o := range opts {

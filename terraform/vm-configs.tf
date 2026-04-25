@@ -1,7 +1,7 @@
-# The four Daedalus guests per docs/phase-1-plan.md §3.2 and
+# The four Zakros guests per docs/phase-1-plan.md §3.2 and
 # architecture.md §4 VM Inventory. All guests sit on a single internal
-# SDN VNet (see variables.tf — sdn_vnet / daedalus_vlan_id /
-# daedalus_subnet). The last octet comes from `ip_offset`; OPNsense
+# SDN VNet (see variables.tf — sdn_vnet / zakros_vlan_id /
+# zakros_subnet). The last octet comes from `ip_offset`; OPNsense
 # takes `.1` as the gateway.
 
 locals {

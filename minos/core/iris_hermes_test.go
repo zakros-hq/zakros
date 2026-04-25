@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	hermescore "github.com/GoodOlClint/daedalus/hermes/core"
-	"github.com/GoodOlClint/daedalus/minos/core"
+	hermescore "github.com/zakros-hq/zakros/hermes/core"
+	"github.com/zakros-hq/zakros/minos/core"
 )
 
 func TestIrisPullFilter(t *testing.T) {

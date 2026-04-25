@@ -44,7 +44,7 @@ type PodSpec struct {
 	Image string
 
 	// Envelope is the full task-envelope JSON. The dispatcher delivers
-	// it to the pod as a Secret-backed file at /var/run/daedalus/envelope.json
+	// it to the pod as a Secret-backed file at /var/run/zakros/envelope.json
 	// (path defined by EnvelopePath on the pod side).
 	Envelope []byte
 

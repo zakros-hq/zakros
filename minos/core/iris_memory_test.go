@@ -10,8 +10,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/GoodOlClint/daedalus/minos/core"
-	mnemocore "github.com/GoodOlClint/daedalus/mnemosyne/core"
+	"github.com/zakros-hq/zakros/minos/core"
+	mnemocore "github.com/zakros-hq/zakros/mnemosyne/core"
 )
 
 func TestMemoryLookupRequiresIrisAuth(t *testing.T) {

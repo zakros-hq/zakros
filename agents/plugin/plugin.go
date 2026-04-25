@@ -11,14 +11,14 @@
 // Subprocess protocol summary (authoritative per architecture.md §8):
 //
 //  1. Pod is spawned with the envelope JSON available at the path given
-//     by the DAEDALUS_ENVELOPE environment variable (or on stdin when
+//     by the ZAKROS_ENVELOPE environment variable (or on stdin when
 //     the env var is unset — plugin author's choice at the contract
 //     boundary, Minos supports both).
 //  2. Plugin performs work. Status, thinking, and code-block updates go
-//     through the thread sidecar's MCP at DAEDALUS_THREAD_URL. Human
+//     through the thread sidecar's MCP at ZAKROS_THREAD_URL. Human
 //     input requests are the same MCP's request_human_input.
 //  3. On SIGTERM, plugin has 30 seconds to flush memory extraction to
-//     the shared volume at /var/run/daedalus/memory/ before SIGKILL.
+//     the shared volume at /var/run/zakros/memory/ before SIGKILL.
 //  4. Exit code 0 = success; nonzero = failure. Minos marks the task
 //     accordingly and persists whatever memory blob was flushed.
 package plugin

@@ -8,10 +8,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/GoodOlClint/daedalus/minos/core"
-	"github.com/GoodOlClint/daedalus/minos/dispatch"
-	"github.com/GoodOlClint/daedalus/minos/storage"
-	"github.com/GoodOlClint/daedalus/pkg/envelope"
+	"github.com/zakros-hq/zakros/minos/core"
+	"github.com/zakros-hq/zakros/minos/dispatch"
+	"github.com/zakros-hq/zakros/minos/storage"
+	"github.com/zakros-hq/zakros/pkg/envelope"
 )
 
 func TestArgusHibernatesOnPodSucceeded(t *testing.T) {
@@ -26,7 +26,7 @@ func TestArgusHibernatesOnPodSucceeded(t *testing.T) {
 	}
 	// Simulate the pod opening a PR and exiting cleanly — the dispatcher
 	// reports Succeeded and Argus should hibernate.
-	kit.dispatcher.SetPhase("daedalus", *task.PodName, dispatch.PhaseSucceeded)
+	kit.dispatcher.SetPhase("zakros", *task.PodName, dispatch.PhaseSucceeded)
 	// Argus isn't wired in the default testServerKit, so drive the
 	// transition directly: simulate what Argus.evaluate would do.
 	// (TestCommissionHibernatesIntegration below exercises the full path.)
@@ -73,7 +73,7 @@ func TestRespawnHappyPath(t *testing.T) {
 		t.Fatalf("transition: %v", err)
 	}
 	// Original pod gone.
-	_ = kit.dispatcher.DeletePod(context.Background(), "daedalus", firstPod)
+	_ = kit.dispatcher.DeletePod(context.Background(), "zakros", firstPod)
 
 	respawned, err := kit.server.Respawn(context.Background(), task.ID)
 	if err != nil {
@@ -119,7 +119,7 @@ func TestWebhookChangesRequestedTriggersRespawn(t *testing.T) {
 	}
 	// Drop the first pod so the respawn has a clean dispatcher surface.
 	firstPod := *task.PodName
-	_ = kit.dispatcher.DeletePod(context.Background(), "daedalus", firstPod)
+	_ = kit.dispatcher.DeletePod(context.Background(), "zakros", firstPod)
 
 	// Deliver the changes_requested webhook.
 	payload := []byte(`{"action":"submitted","review":{"state":"changes_requested"},"pull_request":{"html_url":"` + prURL + `"}}`)

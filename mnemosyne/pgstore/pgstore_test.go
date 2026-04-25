@@ -10,12 +10,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	mcore "github.com/GoodOlClint/daedalus/mnemosyne/core"
-	"github.com/GoodOlClint/daedalus/mnemosyne/pgstore"
-	minospg "github.com/GoodOlClint/daedalus/minos/storage/pgstore"
+	mcore "github.com/zakros-hq/zakros/mnemosyne/core"
+	"github.com/zakros-hq/zakros/mnemosyne/pgstore"
+	minospg "github.com/zakros-hq/zakros/minos/storage/pgstore"
 )
 
-const dsnEnv = "DAEDALUS_TEST_POSTGRES_DSN"
+const dsnEnv = "ZAKROS_TEST_POSTGRES_DSN"
 
 func openTestStore(t *testing.T) *pgstore.Store {
 	t.Helper()

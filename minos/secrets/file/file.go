@@ -17,7 +17,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/GoodOlClint/daedalus/pkg/provider"
+	"github.com/zakros-hq/zakros/pkg/provider"
 )
 
 // Store is the on-disk JSON shape. Credentials map ref → base64-or-literal

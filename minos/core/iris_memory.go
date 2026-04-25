@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/GoodOlClint/daedalus/pkg/audit"
+	"github.com/zakros-hq/zakros/pkg/audit"
 )
 
 // memoryLookupRequest is the body Iris POSTs to /memory/lookup.

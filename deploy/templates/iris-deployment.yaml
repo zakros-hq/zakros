@@ -6,13 +6,13 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: daedalus
+  name: zakros
 ---
 apiVersion: v1
 kind: Secret
 metadata:
   name: iris-secrets
-  namespace: daedalus
+  namespace: zakros
 type: Opaque
 stringData:
   # All four are populated by deploy/iris-install.sh from secrets.json.
@@ -25,28 +25,28 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: iris
-  namespace: daedalus
+  namespace: zakros
   labels:
-    daedalus.project/pod-class: iris
+    zakros.project/pod-class: iris
 spec:
   replicas: 1
   strategy:
     type: Recreate
   selector:
     matchLabels:
-      daedalus.project/pod-class: iris
+      zakros.project/pod-class: iris
   template:
     metadata:
       labels:
-        daedalus.project/pod-class: iris
+        zakros.project/pod-class: iris
     spec:
       restartPolicy: Always
       containers:
         - name: iris
-          image: daedalus/iris:local
+          image: zakros/iris:local
           imagePullPolicy: IfNotPresent
           env:
-            - name: DAEDALUS_MINOS_URL
+            - name: ZAKROS_MINOS_URL
               value: REPLACE_MINOS_URL
             - name: IRIS_PROJECT_ID
               value: REPLACE_PROJECT_ID

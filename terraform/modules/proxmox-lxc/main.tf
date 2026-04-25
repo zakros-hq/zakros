@@ -2,13 +2,13 @@ data "local_file" "ssh_public_key" {
   filename = pathexpand(var.ssh_public_key_path)
 }
 
-resource "proxmox_virtual_environment_container" "daedalus" {
+resource "proxmox_virtual_environment_container" "zakros" {
   for_each = var.lxc_configurations
 
   node_name     = var.proxmox_node
   vm_id         = each.value.vm_id
   description   = each.value.description
-  tags          = ["daedalus", each.key, "lxc"]
+  tags          = ["zakros", each.key, "lxc"]
   unprivileged  = true
   start_on_boot = true
 

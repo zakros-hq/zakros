@@ -34,7 +34,7 @@ variable "proxmox_ssh_host" {
 
 variable "proxmox_node" {
   type        = string
-  description = "Proxmox node name to place all Daedalus guests on"
+  description = "Proxmox node name to place all Zakros guests on"
   default     = "crete"
 }
 
@@ -50,7 +50,7 @@ variable "image_datastore" {
   default     = "local"
 }
 
-# Daedalus network — single internal VLAN on Crete, no physical uplink.
+# Zakros network — single internal VLAN on Crete, no physical uplink.
 # Proxmox SDN creates the VNet; guests attach to that VNet directly.
 # Egress flows through the OPNsense firewall VM (see modules/opnsense-firewall).
 
@@ -62,7 +62,7 @@ variable "wan_bridge" {
 
 variable "guest_vlan_id" {
   type        = number
-  description = "VLAN tag applied to every Daedalus guest NIC. Must exist on the upstream homelab switch."
+  description = "VLAN tag applied to every Zakros guest NIC. Must exist on the upstream homelab switch."
   default     = 140
   validation {
     condition     = var.guest_vlan_id >= 2 && var.guest_vlan_id <= 4094
@@ -72,14 +72,14 @@ variable "guest_vlan_id" {
 
 variable "internal_bridge" {
   type        = string
-  description = "VLAN-aware Proxmox bridge with NO physical uplink that hosts the Daedalus SDN zone. Create manually: `auto vmbr1` + `iface vmbr1 inet manual` + `bridge-vlan-aware yes` + `bridge-vids 2-4094`"
+  description = "VLAN-aware Proxmox bridge with NO physical uplink that hosts the Zakros SDN zone. Create manually: `auto vmbr1` + `iface vmbr1 inet manual` + `bridge-vlan-aware yes` + `bridge-vids 2-4094`"
   default     = "vmbr1"
 }
 
 variable "sdn_zone" {
   type        = string
   description = "Proxmox SDN VLAN zone name (Proxmox enforces ≤ 8 chars, lowercase)"
-  default     = "daedalus"
+  default     = "zakros"
   validation {
     condition     = length(var.sdn_zone) <= 8 && can(regex("^[a-z][a-z0-9]*$", var.sdn_zone))
     error_message = "sdn_zone must be ≤ 8 lowercase alphanumeric chars."
@@ -96,19 +96,19 @@ variable "sdn_vnet" {
   }
 }
 
-variable "daedalus_vlan_id" {
+variable "zakros_vlan_id" {
   type        = number
-  description = "VLAN tag for the Daedalus VNet (200+ recommended to avoid homelab overlap)"
+  description = "VLAN tag for the Zakros VNet (200+ recommended to avoid homelab overlap)"
   default     = 200
   validation {
-    condition     = var.daedalus_vlan_id >= 2 && var.daedalus_vlan_id <= 4094
+    condition     = var.zakros_vlan_id >= 2 && var.zakros_vlan_id <= 4094
     error_message = "VLAN id must be between 2 and 4094."
   }
 }
 
-variable "daedalus_subnet" {
+variable "zakros_subnet" {
   type        = string
-  description = "CIDR for the Daedalus VNet; OPNsense LAN gets .1"
+  description = "CIDR for the Zakros VNet; OPNsense LAN gets .1"
   default     = "10.100.0.0/24"
 }
 
@@ -123,7 +123,7 @@ variable "dns_servers" {
 variable "admin_username" {
   type        = string
   description = "Admin user created inside every guest via cloud-init"
-  default     = "daedalus"
+  default     = "zakros"
 }
 
 variable "admin_password_hash" {
@@ -148,7 +148,7 @@ variable "timezone" {
 variable "domain_suffix" {
   type        = string
   description = "Domain suffix for guest FQDNs"
-  default     = "daedalus.local"
+  default     = "zakros.local"
 }
 
 # Image selection — operator usually leaves defaults. create_cloud_image

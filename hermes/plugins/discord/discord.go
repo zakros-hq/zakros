@@ -14,7 +14,7 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 
-	"github.com/GoodOlClint/daedalus/hermes/core"
+	"github.com/zakros-hq/zakros/hermes/core"
 )
 
 // surfaceName is the name the plugin registers under with the Broker.

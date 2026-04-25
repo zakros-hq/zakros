@@ -1,4 +1,4 @@
-# Project Daedalus — Architecture Design Document
+# Project Zakros — Architecture Design Document
 
 *Version 0.2 — Draft*
 
@@ -6,7 +6,7 @@
 
 ## 1. Overview
 
-Project Daedalus is an autonomous AI agent orchestration system built for software development and infrastructure management. The system coordinates AI agents that build, test, and deploy software across isolated workspace environments, with a persistent control plane managing agent lifecycle, communications, and capability access.
+Project Zakros is an autonomous AI agent orchestration system built for software development and infrastructure management. The system coordinates AI agents that build, test, and deploy software across isolated workspace environments, with a persistent control plane managing agent lifecycle, communications, and capability access.
 
 The architecture is designed to evolve from a single-agent system toward a multi-agent, multi-project platform with isolated agent workspaces and production-equivalent provisioning targets.
 
@@ -31,12 +31,12 @@ The architecture is designed to evolve from a single-agent system toward a multi
 
 | Name | What it is | Host | Phase |
 |---|---|---|---|
-| **Crete** | MS-01 physical host — Proxmox hypervisor for all Daedalus infrastructure VMs | Physical hardware | 1 |
+| **Crete** | MS-01 physical host — Proxmox hypervisor for all Zakros infrastructure VMs | Physical hardware | 1 |
 | **Athena** | AI inference node — LLM inference, transcription, embeddings, domain knowledge corpus | Mac Studio M4 Max (bare metal) | 1 |
 | **Labyrinth** | k3s cluster — ephemeral Daedalus pod workspaces | k3s VM on Crete | 1 |
 | **Minos** | Control plane VM — receives commands, commissions agents, manages lifecycle, composes MCP capability sets | VM on Crete | 1 |
 | **Mnemosyne** | Memory and context service — stores run records, learned facts, and project contexts; serves context blobs at pod spawn and handles memory lookups via MCP broker | Runs alongside Minos | 1 |
-| **Ariadne** | Log archive — collects and stores unstructured log streams from every Daedalus component for forensics and debugging | VM on Crete | 1 |
+| **Ariadne** | Log archive — collects and stores unstructured log streams from every Zakros component for forensics and debugging | VM on Crete | 1 |
 | **Hermes** | Messaging broker — centralizes human-facing communication; pluggable per-surface plugins (Discord, Slack, Teams, Telegram, Matrix, etc.); handles command intake and task-thread posting | Runs alongside Minos | 1 (single plugin, in-process); 2 (multi-plugin, subprocess isolation) |
 | **Cerberus** | Ingress broker — pluggable ingress-path plugins and per-source verification plugins; authenticates inbound webhooks and routes to Minos or Hermes | Runs alongside Minos | 1 (as a library inside Minos: one ingress, one verifier); 2 (standalone broker with plugin layers) |
 | **Daedalus** | AI worker agents — execute tasks, write code, submit PRs | Pods in Labyrinth | 1 |
@@ -52,13 +52,13 @@ The architecture is designed to evolve from a single-agent system toward a multi
 | **Pythia** | Research pods — short-lived, broad internet egress, read-only; invoked by Daedalus agents via the research MCP broker | Pods in Labyrinth | 3 |
 | **Talos** | QA/test pods — provision test environments, exercise features, run integration suites, report results; invoked by Daedalus agents or directly by Minos | Pods in Labyrinth | 3 |
 | **Charon** | Egress proxy — hostname-layer allowlist enforcement for pod egress, per-pod-class policies, request audit to Ariadne | LXC on Crete | 3 |
-| **Asclepius** | Infrastructure health monitor — watches every Daedalus service and host for liveness, readiness, and resource health; alerts and attempts auto-remediation | LXC on Crete | 3 |
-| **Minotaur** | Red team pod — adversarial reasoning against Daedalus itself. Finds non-obvious attack paths, chains vulnerabilities, probes prompt injection against internal agents and MCP brokers. Distinct from a pattern-based security scanner; the work is novel-judgment adversarial synthesis. | Pod in Labyrinth | 3 |
+| **Asclepius** | Infrastructure health monitor — watches every Zakros service and host for liveness, readiness, and resource health; alerts and attempts auto-remediation | LXC on Crete | 3 |
+| **Minotaur** | Red team pod — adversarial reasoning against Zakros itself. Finds non-obvious attack paths, chains vulnerabilities, probes prompt injection against internal agents and MCP brokers. Distinct from a pattern-based security scanner; the work is novel-judgment adversarial synthesis. | Pod in Labyrinth | 3 |
 | **Typhon** | Sandboxed destructive test runner — intentionally breaks things inside isolated workspaces to validate recovery automation. Chaos-engineering counterpart to Minotaur's adversarial reasoning: Typhon breaks infrastructure and code paths; Minotaur breaks agents. | Pod in Labyrinth | 3 |
 
 ### Naming Notes
 
-The project umbrella is **Daedalus** — the master craftsman whose works encompass everything built here. Individual agents are also called Daedalus instances; the agents are the builders. Minos is the commissioner who directs their work. Argus is the all-seeing watcher who ensures they stay on course. The Labyrinth is the structure built on Crete where the work happens. Ariadne holds the thread — the record of what happened inside the Labyrinth, available when operators need to retrace an incident. Pythia is the oracle of Delphi — she answers questions but does not act. When Daedalus needs to research something beyond its egress boundary, it sends the question to Pythia. Mnemosyne is the Titaness of memory, mother of the Muses — she retains what the agents have learned across runs, so that nothing hard-won is lost when a pod tears down. Hermes is the messenger of the gods, carrying messages between realms — the Hermes broker carries human-facing messages between Daedalus and whichever chat surface (Discord, Slack, Teams, Telegram) a project uses. Charon is the ferryman across the Styx, taking payment from travelers to cross the boundary — the Charon proxy checks each pod's credentials before letting its requests pass out to the public internet. Cerberus is the three-headed guard at the gate of Hades — the Cerberus broker checks every inbound request, verifies credentials, and refuses unauthorized passage. Iris is the rainbow goddess who carried messages between the divine and mortal realms, translating what she carried so each side understood — the Iris agent does the same between human conversation and Daedalus's structured operations. Asclepius is the god of medicine and healing — the Asclepius service watches the health of every component in the system, alerts when something falls ill, and treats what it can. Apollo is the god of oracles — external LLM APIs are the remote oracles Daedalus agents consult, and the Apollo broker is the service that carries their queries and counts what comes back. Hecate is the goddess of keys, boundaries, and crossroads — her standard epithet *Kleidouchos* means "key-bearer"; the Hecate broker holds credential material and decides, per Minos-set ACLs, which caller may fetch which key. Themis is the goddess of divine order, proper procedure, and right timing — the Themis pod owns the backlog and decomposes work so that what Daedalus builds arrives in the correct sequence. Momus is the god of criticism and fault-finding, whose mythological function was identifying flaws in the work of other gods — the Momus pod reviews PRs. Clio is the Muse of history and record-keeping — the Clio pod writes and maintains project documentation. Prometheus is the titan who brought capability into the world and enabled everything else to function — the Prometheus pod owns release engineering, the layer that takes built software and makes it reach production. Hephaestus is the master craftsman of the gods who built the divine infrastructure and created autonomous constructs — Daedalus's divine counterpart, and the Hephaestus pod is the architectural assistant, drafting decisions rather than making them. Minotaur is the monster kept in the Labyrinth — the Minotaur pod is the adversarial agent that prowls the Labyrinth looking for weaknesses in Daedalus itself. Typhon is the primordial monster of chaos and storms — the Typhon pod is the destructive test runner, breaking infrastructure and code paths on purpose to validate that recovery works.
+The project umbrella is **Zakros** — named for the Minoan palace site at Kato Zakro on Crete. Component names are drawn from the Minotaur myth. **Daedalus** is the master craftsman whose works encompass everything built here; individual worker agents are called Daedalus instances, the agents are the builders. Minos is the commissioner who directs their work. Argus is the all-seeing watcher who ensures they stay on course. The Labyrinth is the structure built on Crete where the work happens. Ariadne holds the thread — the record of what happened inside the Labyrinth, available when operators need to retrace an incident. Pythia is the oracle of Delphi — she answers questions but does not act. When Zakros needs to research something beyond its egress boundary, it sends the question to Pythia. Mnemosyne is the Titaness of memory, mother of the Muses — she retains what the agents have learned across runs, so that nothing hard-won is lost when a pod tears down. Hermes is the messenger of the gods, carrying messages between realms — the Hermes broker carries human-facing messages between Zakros and whichever chat surface (Discord, Slack, Teams, Telegram) a project uses. Charon is the ferryman across the Styx, taking payment from travelers to cross the boundary — the Charon proxy checks each pod's credentials before letting its requests pass out to the public internet. Cerberus is the three-headed guard at the gate of Hades — the Cerberus broker checks every inbound request, verifies credentials, and refuses unauthorized passage. Iris is the rainbow goddess who carried messages between the divine and mortal realms, translating what she carried so each side understood — the Iris agent does the same between human conversation and Zakros's structured operations. Asclepius is the god of medicine and healing — the Asclepius service watches the health of every component in the system, alerts when something falls ill, and treats what it can. Apollo is the god of oracles — external LLM APIs are the remote oracles Daedalus agents consult, and the Apollo broker is the service that carries their queries and counts what comes back. Hecate is the goddess of keys, boundaries, and crossroads — her standard epithet *Kleidouchos* means "key-bearer"; the Hecate broker holds credential material and decides, per Minos-set ACLs, which caller may fetch which key. Themis is the goddess of divine order, proper procedure, and right timing — the Themis pod owns the backlog and decomposes work so that what Zakros builds arrives in the correct sequence. Momus is the god of criticism and fault-finding, whose mythological function was identifying flaws in the work of other gods — the Momus pod reviews PRs. Clio is the Muse of history and record-keeping — the Clio pod writes and maintains project documentation. Prometheus is the titan who brought capability into the world and enabled everything else to function — the Prometheus pod owns release engineering, the layer that takes built software and makes it reach production. Hephaestus is the master craftsman of the gods who built the divine infrastructure and created autonomous constructs — Daedalus's divine counterpart, and the Hephaestus pod is the architectural assistant, drafting decisions rather than making them. Minotaur is the monster kept in the Labyrinth — the Minotaur pod is the adversarial agent that prowls the Labyrinth looking for weaknesses in Zakros itself. Typhon is the primordial monster of chaos and storms — the Typhon pod is the destructive test runner, breaking infrastructure and code paths on purpose to validate that recovery works.
 
 **Icarus** is not a component. It is the post-mortem document written when a Daedalus agent ignores Argus and affects something it should not have.
 
@@ -73,7 +73,7 @@ The project umbrella is **Daedalus** — the master craftsman whose works encomp
 | Component | Specification | Notes |
 |---|---|---|
 | CPU | Intel Core i9-13900H | 14 cores / 20 threads (6P+8E), VT-d, strong single-thread performance |
-| RAM | 96GB DDR5 (2× 48GB SO-DIMM) | Sized for Daedalus infrastructure with substantial headroom for co-resident workloads |
+| RAM | 96GB DDR5 (2× 48GB SO-DIMM) | Sized for Zakros infrastructure with substantial headroom for co-resident workloads |
 | NVMe M.2 slot 1 | 1TB | ZFS mirror — VM storage pool |
 | NVMe M.2 slot 2 | 1TB | ZFS mirror — VM storage pool |
 | NVMe M.2 slot 3 | — | Reserved — future expansion |
@@ -82,9 +82,9 @@ The project umbrella is **Daedalus** — the master craftsman whose works encomp
 
 ### Storage Layout
 
-The two 1TB NVMe drives are configured as a ZFS mirror pool, providing approximately 1TB of usable storage with single-drive redundancy. All Daedalus VM and LXC disks are allocated from this pool.
+The two 1TB NVMe drives are configured as a ZFS mirror pool, providing approximately 1TB of usable storage with single-drive redundancy. All Zakros VM and LXC disks are allocated from this pool.
 
-Proxmox snapshots provide fast in-place rollback for Daedalus VMs. Daedalus state is otherwise recoverable from external sources — GitHub is the source of truth for code and branch state, the configured secret provider for credentials, the configured communication surface for task threads — so no off-host backup is provisioned within the Daedalus scope. The third M.2 slot remains reserved for future expansion.
+Proxmox snapshots provide fast in-place rollback for Zakros VMs. Zakros state is otherwise recoverable from external sources — GitHub is the source of truth for code and branch state, the configured secret provider for credentials, the configured communication surface for task threads — so no off-host backup is provisioned within the Zakros scope. The third M.2 slot remains reserved for future expansion.
 
 ### VM Inventory
 
@@ -96,17 +96,17 @@ Proxmox snapshots provide fast in-place rollback for Daedalus VMs. Daedalus stat
 | Postgres | LXC | 2 | 4GB | 50GB | Shared database with pgvector; backing store for Minos core, Argus state, and Mnemosyne |
 | Labyrinth (k3s) | VM | 4 | 16GB | 200GB | Daedalus and Iris pods |
 | Ariadne | VM | 2 | 4GB | 100GB | Log archive (Vector + Loki) |
-| **Total** | | **10** | **32GB** | **~400GB** | Daedalus-only footprint; ~64GB RAM and 10 CPU threads available for co-resident workloads |
+| **Total** | | **10** | **32GB** | **~400GB** | Zakros-only footprint; ~64GB RAM and 10 CPU threads available for co-resident workloads |
 
 Phase 2 and Phase 3 adjustments (Apollo/Argus extraction, Charon LXC, Asclepius LXC, etc.) grow this footprint; revisit sizing then.
 
 ### Network
 
-Crete connects to the homelab switch via a single trunked port carrying all required VLANs. Internal traffic between Daedalus guests (Minos ↔ Labyrinth, Minos ↔ Postgres LXC, Minos ↔ Ariadne) traverses Proxmox virtual bridges and never leaves the host. Traffic leaving Crete (to Athena, to external GitHub/Discord, inbound webhooks) is gated at each guest's vNIC by the Proxmox firewall, which holds each guest's egress allowlist and inbound rules.
+Crete connects to the homelab switch via a single trunked port carrying all required VLANs. Internal traffic between Zakros guests (Minos ↔ Labyrinth, Minos ↔ Postgres LXC, Minos ↔ Ariadne) traverses Proxmox virtual bridges and never leaves the host. Traffic leaving Crete (to Athena, to external GitHub/Discord, inbound webhooks) is gated at each guest's vNIC by the Proxmox firewall, which holds each guest's egress allowlist and inbound rules.
 
-For the Labyrinth VM, Proxmox firewall enforces the *union* allowlist — everything any pod class or k3s system component needs. Per-pod-class differentiation (narrow Daedalus egress vs broad Pythia egress in Phase 2) happens inside the VM via a host firewall and k3s NetworkPolicy; see §16.
+For the Labyrinth VM, Proxmox firewall enforces the *union* allowlist — everything any pod class or k3s system component needs. Per-pod-class differentiation (narrow Zakros egress vs broad Pythia egress in Phase 2) happens inside the VM via a host firewall and k3s NetworkPolicy; see §16.
 
-The homelab's edge firewall remains in place for broader VLAN policy and ingress routing, but Daedalus does not depend on specific rules there for its own isolation — the project is self-contained on Crete.
+The homelab's edge firewall remains in place for broader VLAN policy and ingress routing, but Zakros does not depend on specific rules there for its own isolation — the project is self-contained on Crete.
 
 ---
 
@@ -207,7 +207,7 @@ For each `sandbox.create`:
 
 ### Observability
 
-Athena ships its service logs to Ariadne via Vector, mirroring the log-shipping pattern used by every other Daedalus component. This is the single permitted exception to the no-initiate-to-Crete-resources rule:
+Athena ships its service logs to Ariadne via Vector, mirroring the log-shipping pattern used by every other Zakros component. This is the single permitted exception to the no-initiate-to-Crete-resources rule:
 
 - **Shipped:** Ollama, embedding server, Qdrant, whisper, Athena MCP, and Development Sandbox process logs
 - **Purpose:** let operators correlate agent flows end-to-end in one place (Ariadne) — an inference query from a pod can be traced through the agent's conversation log, the MCP call, and the inference-side execution
@@ -230,7 +230,7 @@ Minos is the persistent orchestrator and the only initiation gate: no pod runs u
 
 **Phase:** Phase 1 ships Hermes with a single surface plugin loaded in-process; subprocess isolation, multi-plugin, credential rotation, and message signing are **Phase 2**. The task_id→thread_ref binding is Phase 1 (cheap, worth keeping).
 
-Daedalus communicates with humans — command intake and per-task threads — through **Hermes**, a centralized messaging broker with per-surface plugins. Each plugin implements a surface-specific integration:
+Zakros communicates with humans — command intake and per-task threads — through **Hermes**, a centralized messaging broker with per-surface plugins. Each plugin implements a surface-specific integration:
 
 - **Command intake** — receives `/pair`, `/daedalus start`, `/minos approve`, etc. from the surface and forwards to Minos
 - **Thread management** — creates and looks up surface-native threads/channels/DMs (Discord threads, Slack threads, Telegram groups, Teams channels, Matrix rooms)
@@ -323,7 +323,7 @@ Ingress-plugin selection is a deployment choice, not a per-request choice — on
 
 ### LLM Broker: Apollo
 
-**Phase:** Apollo is **Phase 2**. Phase 1 has no external-LLM broker because no pod calls an external LLM API through Daedalus-managed plumbing — the `claude-code` binary in Daedalus pods manages its own Anthropic connection, and Iris uses Athena-local inference via Ollama. Apollo lands when a second provider or centralized usage tracking becomes useful.
+**Phase:** Apollo is **Phase 2**. Phase 1 has no external-LLM broker because no pod calls an external LLM API through Zakros-managed plumbing — the `claude-code` binary in Daedalus pods manages its own Anthropic connection, and Iris uses Athena-local inference via Ollama. Apollo lands when a second provider or centralized usage tracking becomes useful.
 
 Every external LLM API call from a Daedalus agent flows through **Apollo**, an MCP broker running alongside Minos on the Minos VM. Apollo fronts providers like Anthropic, OpenAI, Google, xAI, etc., via per-provider plugins. Local inference still goes to Athena directly; Apollo specifically handles external-API inference so those calls are tracked, rate-limited, and paid for under one observed surface.
 
@@ -357,7 +357,7 @@ Pod's worker backend → Apollo MCP (scoped: apollo.infer for the requested mode
   → Apollo logs the call to Ariadne
 ```
 
-**MCP scopes** on pods' JWTs determine which models a given pod may use. Example: a Daedalus code pod's JWT might include `apollo.anthropic.claude-*`; an inference-tuning task might include `apollo.anthropic.*, apollo.openai.*`. Scope maps are declared in the project registry.
+**MCP scopes** on pods' JWTs determine which models a given pod may use. Example: a Zakros code pod's JWT might include `apollo.anthropic.claude-*`; an inference-tuning task might include `apollo.anthropic.*, apollo.openai.*`. Scope maps are declared in the project registry.
 
 **Credential rotation.** Provider keys rotate via the secret provider's SIGHUP pattern (same as Hermes plugins). In-flight requests complete on pre-rotation keys; new requests use new keys.
 
@@ -499,7 +499,7 @@ When a pod terminates (Argus termination or normal teardown), Argus may have tri
 
 **Audit.** Every break-glass session — request, approval, credentials issued, each kubectl call, session close — lands in Ariadne with full operator identity, task context, and reason. Repeated break-glass activity on the same task or operator is a legitimate pattern Ariadne surfaces for review rather than a guardrail breach (contrast with a compromised pod, which triggers Argus termination).
 
-**Scope: pods only.** Break-glass covers agent pods. Minos-VM services (Minos, Argus, Hermes, Cerberus, Mnemosyne) are not in scope for break-glass; operator access to those is SSH-to-Minos-VM with standard OS-level auth, outside Daedalus's identity model. The reason: break-glass exists for investigating agent behavior, not for administering the control plane. Control-plane administration is a different trust boundary with different audit and access requirements.
+**Scope: pods only.** Break-glass covers agent pods. Minos-VM services (Minos, Argus, Hermes, Cerberus, Mnemosyne) are not in scope for break-glass; operator access to those is SSH-to-Minos-VM with standard OS-level auth, outside Zakros's identity model. The reason: break-glass exists for investigating agent behavior, not for administering the control plane. Control-plane administration is a different trust boundary with different audit and access requirements.
 
 ### Dispatch Queue
 
@@ -551,7 +551,7 @@ Hecate is Phase 2 specifically because its caller-authentication relies on the J
 
 **GitHub credentials — the default pattern.**
 
-Daedalus is deployed as a GitHub App per GitHub organization or account. The App holds permissions for: repo contents (read/write), pull requests (read/write), issues (read/write), metadata (read). Minos stores the App's private key reference in the secret provider.
+Zakros is deployed as a GitHub App per GitHub organization or account. The App holds permissions for: repo contents (read/write), pull requests (read/write), issues (read/write), metadata (read). Minos stores the App's private key reference in the secret provider.
 
 At pod spawn, for tasks that touch GitHub:
 
@@ -562,7 +562,7 @@ At pod spawn, for tasks that touch GitHub:
 
 **Claude credential for `claude-code` pods.**
 
-Phase 1 Daedalus pods invoke the `claude-code` binary, which manages its own Anthropic connection. Minos resolves the operator-configured Claude credential (Anthropic API key or OAuth token) via the secret provider and injects it into the pod's environment at spawn. The credential is held at the deployment scope — one operator's subscription — because Phase 1 runs a single project with a single operator. No Daedalus broker sits between the pod and Anthropic in Phase 1; Apollo (Phase 2) adds that layer when needed.
+Phase 1 Daedalus pods invoke the `claude-code` binary, which manages its own Anthropic connection. Minos resolves the operator-configured Claude credential (Anthropic API key or OAuth token) via the secret provider and injects it into the pod's environment at spawn. The credential is held at the deployment scope — one operator's subscription — because Phase 1 runs a single project with a single operator. No Zakros broker sits between the pod and Anthropic in Phase 1; Apollo (Phase 2) adds that layer when needed.
 
 If a task runs actively for longer than an hour — rare given hibernation occurs on `awaiting-review` — the token expires and the next GitHub operation fails. Minos treats this as a signal to hibernate and respawn with a fresh token on the next qualifying event. Phase 2 adds in-pod token refresh to avoid the failure-retry cycle.
 
@@ -627,7 +627,7 @@ The table below groups brokers by role: external/infra first (`github`, `proxmox
 | `hermes` | `post_as_iris`, `events.next` (Iris only — see Cross-thread posting enforcement and Inbound message delivery). Other Hermes operations are proxied through the `thread` sidecar, not called via `hermes.*` scopes directly. |
 | `minos` | `query_state` — read-only access to Minos's state API (task list, queue depth, recent activity). Iris uses this to answer "what's running?"-style questions. Commissions and directs are user-on-behalf-of and travel the identity-capability path, not a pod JWT scope. |
 | `asclepius` | `status`, `history`, `check.run`, `remediate` (high-blast; Phase 3). |
-| `ariadne` | `query` — recent-log queries; Iris uses this to answer "what did Daedalus do on X?" style questions. |
+| `ariadne` | `query` — recent-log queries; Iris uses this to answer "what did Zakros do on X?" style questions. |
 
 **Request flow.** Pod sends an HTTP request to the broker with `Authorization: Bearer <jwt>`. The broker:
 
@@ -676,7 +676,7 @@ The `scopes` array on each mcp_endpoint mirrors the JWT `mcp_scopes` entry for a
 Minos is the trust anchor of the system, so its restart behavior is load-bearing. On startup — after a crash, reboot, or scheduled restart — Minos executes the following reconciliation before resuming normal operation:
 
 1. **Database integrity check.** The shared Postgres instance in the Postgres LXC is verified on startup (connection, schema version, basic consistency). If the DB is unreachable or corrupted, Minos fails fast rather than proceeding on damaged state.
-2. **Query k3s for managed pods.** A label selector (`daedalus.project/task-id`) matches all pods Minos commissioned.
+2. **Query k3s for managed pods.** A label selector (`zakros.project/task-id`) matches all pods Minos commissioned.
 3. **Reconcile pods against the task registry.** For each live pod:
    - Task record exists with consistent state → re-adopt; resume watching
    - Task record exists but state diverged (e.g., marked `completed` while pod is alive) → trust k3s and update the record; log the discrepancy
@@ -684,7 +684,7 @@ Minos is the trust anchor of the system, so its restart behavior is load-bearing
 4. **Reconcile `running` tasks without a live pod.** The pod terminated during Minos downtime. Inspect k3s (if the record is still present) for termination reason: success → mark completed, preserve any partial memory; error or eviction → mark failed, respawn on next qualifying trigger.
 5. **Resume queued tasks.** Dispatch from the queue by priority class and arrival time.
 6. **Catch up on missed webhooks.** For each watched repo, query the GitHub API for PR events since the last sync timestamp. Reconcile PR states against task records and fire any respawn triggers that should have fired during downtime.
-7. **Catch up on missed surface messages.** Hermes surface streams (Discord, Slack, Telegram) do not replay to reconnecting clients, so commission requests and direct-agent messages issued during downtime are not automatically recovered. Phase 1 posture: on reconnect, Minos posts a visible "Daedalus was offline from T1 to T2; please re-issue any commands sent during that window" message to each configured admin channel, and relies on users re-issuing. Phase 2+ replaces this with a per-surface inbound history fetch (where the surface supports it) plus a timestamped replay stream to running pods so agents can decide whether to re-plan or `request_human_input`.
+7. **Catch up on missed surface messages.** Hermes surface streams (Discord, Slack, Telegram) do not replay to reconnecting clients, so commission requests and direct-agent messages issued during downtime are not automatically recovered. Phase 1 posture: on reconnect, Minos posts a visible "Zakros was offline from T1 to T2; please re-issue any commands sent during that window" message to each configured admin channel, and relies on users re-issuing. Phase 2+ replaces this with a per-surface inbound history fetch (where the surface supports it) plus a timestamped replay stream to running pods so agents can decide whether to re-plan or `request_human_input`.
 8. **Resume normal operation.** Event loops restart, monitoring of Argus resumes.
 
 The Postgres instance runs in a dedicated Proxmox LXC on Crete, shared by Minos core, Argus, and Mnemosyne (one DB, separate schemas). Minos/Argus/Mnemosyne connect over the Proxmox virtual bridge — same-host latency, independent restart domain. Proxmox snapshots of the LXC are the recovery floor; Postgres WAL durability is the steady-state guarantee. The SQLite reference implementation (local-dev only) uses WAL mode with on-startup checkpointing.
@@ -753,13 +753,13 @@ Admin-configured escalation classes (high-blast scope breach, repeated pod crash
 
 ### Availability
 
-**Phase:** The Minos-polls-Argus monitoring below applies from **Phase 2** onward, when Argus is a separate service. In Phase 1 Argus logic is bundled into Minos and lives or dies with the Minos process — there is no separate thing to monitor. Phase 1 relies on Proxmox's native VM-level monitoring and systemd-level service supervision; Asclepius (Phase 3) provides the first Daedalus-native cross-service health watch.
+**Phase:** The Minos-polls-Argus monitoring below applies from **Phase 2** onward, when Argus is a separate service. In Phase 1 Argus logic is bundled into Minos and lives or dies with the Minos process — there is no separate thing to monitor. Phase 1 relies on Proxmox's native VM-level monitoring and systemd-level service supervision; Asclepius (Phase 3) provides the first Zakros-native cross-service health watch.
 
 Argus is itself monitored by Minos. Minos polls Argus's health endpoint on a short cadence; three consecutive failures trigger a service restart. Repeated restart cycles within a window escalate to admins on their configured surfaces for human attention. Because Argus and Minos co-reside on the same VM, this is a local-process check. The Minos VM is the remaining trust anchor.
 
 Argus does not depend on Ariadne for decisions. If Ariadne is down, Argus continues to evaluate agent state from its own event stream; if Argus is down, the control path degrades but Ariadne continues to collect logs via direct pod shipping.
 
-**Postgres outage — Phase 1 fail-silent.** Argus state (per-agent counters, threshold configuration) lives in the shared Postgres LXC. If Postgres is unreachable, Phase 1 Argus cannot persist state transitions and cannot fire warnings or escalations it has not already decided on in memory. **Phase 1 posture is fail-silent on Postgres loss**: the control path degrades, running pods continue on their existing trajectories, and the operator notices via the Proxmox-level VM-health alert on the Postgres LXC — not via Argus. This is an accepted Phase 1 risk for a single-operator single-VM deployment with no Asclepius. Phase 3 (when Asclepius lands) adds a Daedalus-native alert path for Postgres loss; Phase 2+ may add in-memory degraded mode to Argus itself if operational experience warrants.
+**Postgres outage — Phase 1 fail-silent.** Argus state (per-agent counters, threshold configuration) lives in the shared Postgres LXC. If Postgres is unreachable, Phase 1 Argus cannot persist state transitions and cannot fire warnings or escalations it has not already decided on in memory. **Phase 1 posture is fail-silent on Postgres loss**: the control path degrades, running pods continue on their existing trajectories, and the operator notices via the Proxmox-level VM-health alert on the Postgres LXC — not via Argus. This is an accepted Phase 1 risk for a single-operator single-VM deployment with no Asclepius. Phase 3 (when Asclepius lands) adds a Zakros-native alert path for Postgres loss; Phase 2+ may add in-memory degraded mode to Argus itself if operational experience warrants.
 
 ### State Persistence and Recovery
 
@@ -782,7 +782,7 @@ Argus-sidecars inside pods buffer a small number of recent heartbeats and retry 
 
 ### Role
 
-A Daedalus agent is a worker backend running inside an isolated pod in the Labyrinth k3s cluster. The backend is pluggable — Claude Code, Aider, a custom LLM agent, or any future tool that implements the Daedalus worker interface. Each agent is commissioned for a specific task — a feature branch, a refactor, an infrastructure change.
+A Daedalus agent is a worker backend running inside an isolated pod in the Labyrinth k3s cluster. The backend is pluggable — Claude Code, Aider, a custom LLM agent, or any future tool that implements the Zakros worker interface. Each agent is commissioned for a specific task — a feature branch, a refactor, an infrastructure change.
 
 **Task vs. run.** A task is the unit of work. A run is a single pod execution of that task. A task may span multiple runs: the initial run plus any respawns after hibernation (see Hibernation and Respawn below). Task identity (`task_id`) persists across runs; each run has its own `run_id` and produces its own record in Mnemosyne. A task lives from first commissioning until its PR is merged or closed, or until it is abandoned by policy.
 
@@ -973,7 +973,7 @@ This table lists MCP-scoped broker reaches only. Non-MCP network reaches — dir
 
 Agents work in an adversarial environment. Source code files, PR comments, issue text, tool output, and research results are all attacker-controllable on any repo with outside contributors or any Pythia response. An agent that treats content it reads as instructions is a prompt-injection target with a potentially very high blast radius — MCP capabilities let a compromised agent push malicious code, provision infrastructure, refresh corpus data, or exfiltrate secrets.
 
-Daedalus draws a strict trust boundary:
+Zakros draws a strict trust boundary:
 
 | Source | Trust level | Rationale |
 |---|---|---|
@@ -1006,7 +1006,7 @@ Exposed operations:
 
 **Argus sidecar** — emits a periodic heartbeat to the Argus event ingest endpoint independent of the agent's own activity. Runs as a separate container so that a hung or compromised worker backend cannot suppress it. The heartbeat is the primary stall-detection signal for Argus.
 
-**Default for all pod classes.** The two sidecars, the trust-boundary contract, and the per-backend translation responsibility described above are the **default contract for every worker-backend pod class in Daedalus** — Iris (§10), Themis (§11), Momus (§12), Clio (§13), Prometheus (§14), Hephaestus (§15), Pythia (§9), Talos, Minotaur, and Typhon all inherit this shape unless their own section explicitly deviates. Sections that deviate call it out explicitly: Pythia (§9) replaces the thread sidecar with research-broker response flow; Iris (§10) has no Argus sidecar in Phase 1 (§10 Phase 1 stall gap). No other pod class should be read as silently opting out — if its section is silent on sidecars, the §8 default applies.
+**Default for all pod classes.** The two sidecars, the trust-boundary contract, and the per-backend translation responsibility described above are the **default contract for every worker-backend pod class in Zakros** — Iris (§10), Themis (§11), Momus (§12), Clio (§13), Prometheus (§14), Hephaestus (§15), Pythia (§9), Talos, Minotaur, and Typhon all inherit this shape unless their own section explicitly deviates. Sections that deviate call it out explicitly: Pythia (§9) replaces the thread sidecar with research-broker response flow; Iris (§10) has no Argus sidecar in Phase 1 (§10 Phase 1 stall gap). No other pod class should be read as silently opting out — if its section is silent on sidecars, the §8 default applies.
 
 ---
 
@@ -1016,7 +1016,7 @@ Exposed operations:
 
 ### Role
 
-Pythia pods are the research surface. They exist to answer questions from Daedalus agents that require reaching beyond the Daedalus egress allowlist — open web fetches, documentation lookups, research across the public internet. Pythia pods have broad outbound access but no write capability: they cannot edit code, open PRs, mutate infrastructure, or persist state beyond their own lifetime.
+Pythia pods are the research surface. They exist to answer questions from Daedalus agents that require reaching beyond the Zakros egress allowlist — open web fetches, documentation lookups, research across the public internet. Pythia pods have broad outbound access but no write capability: they cannot edit code, open PRs, mutate infrastructure, or persist state beyond their own lifetime.
 
 The interaction pattern is request/response. A Daedalus agent invokes a research capability via MCP; the research broker commissions a Pythia pod through Minos, dispatches the query, collects the response, returns it to the agent, and tears the pod down.
 
@@ -1082,7 +1082,7 @@ The content block is always bracketed by unambiguous untrusted-content markers. 
 
 ### Role
 
-Iris is the natural-language interface to Daedalus. Authorized users interact with the system in their own voice — "what's running?", "start a task to fix bug #123", "summarize what Daedalus did on the auth branch", "who approved that infrastructure change?" — and Iris translates those requests into structured operations or state queries.
+Iris is the natural-language interface to Zakros. Authorized users interact with the system in their own voice — "what's running?", "start a task to fix bug #123", "summarize what Zakros did on the auth branch", "who approved that infrastructure change?" — and Iris translates those requests into structured operations or state queries.
 
 Iris is a long-running pod in Labyrinth. Its lifecycle differs from Daedalus pods: there is no PR to merge, no hibernation on awaiting-review. One Iris pod per deployment, replaced on rolling update when the Iris configuration or backend version changes.
 
@@ -1119,7 +1119,7 @@ For user-delegated actions (commission, direct, approve), Iris does *not* use it
 
 | Aspect | Value |
 |---|---|
-| Pod class label | `daedalus.project/pod-class: iris` |
+| Pod class label | `zakros.project/pod-class: iris` |
 | Lifecycle | Long-running (not task-scoped) |
 | Backend | Phase 1: Ollama-hosted model on Athena, reached via the Athena inference port. Other backends (Claude Code, custom) are Phase 2+ alternatives. |
 | Resource tier | `medium` workspace size default (handles conversation context windows) |
@@ -1149,7 +1149,7 @@ Argus monitors Iris like any other pod — liveness, budget, heartbeat, guardrai
 
 ### Phase 1 Scope
 
-Phase 1 Iris is the primary point of human interaction with Daedalus. It includes:
+Phase 1 Iris is the primary point of human interaction with Zakros. It includes:
 
 - Conversational state queries (task list, queue, recent activity) via Minos's state API
 - Memory lookups via Mnemosyne's MCP broker (`memory.lookup`)
@@ -1186,7 +1186,7 @@ Each delegated action requires an admin API on Minos for Iris to invoke on the u
 Additional Phase 3+ directions:
 
 - Per-surface Iris pods (one per Hermes plugin) if cross-surface conversation mixing becomes a concern
-- Proactive Iris prompts (Iris initiates conversations — "Daedalus finished bug #123, want me to start the review?")
+- Proactive Iris prompts (Iris initiates conversations — "Zakros finished bug #123, want me to start the review?")
 - Fine-tuned domain-specific Iris model hosted on Athena
 
 ---
@@ -1258,7 +1258,7 @@ Local model on Athena — `qwen3.5:27b` default. Task decomposition against the 
 
 ### Role
 
-Momus performs automated PR review for style, correctness, logic, and architectural drift. It runs on every Daedalus-opened PR before human review — triage, not replacement. Items the local tier flags with high confidence, or that match architectural-drift patterns, escalate to a Claude tier through Apollo.
+Momus performs automated PR review for style, correctness, logic, and architectural drift. It runs on every Zakros-opened PR before human review — triage, not replacement. Items the local tier flags with high confidence, or that match architectural-drift patterns, escalate to a Claude tier through Apollo.
 
 Momus is a distinct function from QA (Talos, Phase 3) and from red team (Minotaur, Phase 3). QA exercises running behavior. Red team probes for adversarial weaknesses in agents and brokers. Momus reads code diffs and reasons about them.
 
@@ -1455,7 +1455,7 @@ Projects declare a default size in the Minos project registry. Tasks can overrid
 
 Labyrinth is allocated 4 vCPU and 16GB RAM. At the stated requests, k3s admits up to 4 concurrent Daedalus pods, reserving approximately 2 vCPU and 8GB for system pods (coredns, traefik, local-path-provisioner, metrics-server, kubelet) and burst headroom. Sustained CPU across pods is dominated by idle LLM-wait, so aggregate usage rarely approaches aggregate limits. When no slot is available for an incoming task, Minos queues it rather than rejecting — see §6 Dispatch Queue. Awaiting-review tasks do not hold slots (they hibernate, §8), so the queue is dominated by actively-starting pods, not idle ones.
 
-Crete-level CPU budget: the i9-13900H provides 14 cores / 20 threads. Phase 1 Daedalus assigns 10 vCPU across Minos, Postgres LXC, Labyrinth, and Ariadne, leaving substantial headroom. Co-resident workloads added later may oversubscribe the remaining thread budget at will — the Daedalus agent workload is idle-dominant and tolerates CPU contention well.
+Crete-level CPU budget: the i9-13900H provides 14 cores / 20 threads. Phase 1 Zakros assigns 10 vCPU across Minos, Postgres LXC, Labyrinth, and Ariadne, leaving substantial headroom. Co-resident workloads added later may oversubscribe the remaining thread budget at will — the Daedalus agent workload is idle-dominant and tolerates CPU contention well.
 
 ### Network Isolation
 
@@ -1478,7 +1478,7 @@ Phase 3 adds a third layer:
 
 **Phase 3:** pod-to-pod traffic becomes **default-deny** under Calico — the first phase in which intra-VM pod-to-pod gets any enforcement at all. The broker-mediated coordination pattern (Daedalus → research broker → Pythia, never direct pod-to-pod) makes default-deny the natural fit — there is no legitimate cross-pod traffic flow in normal operation.
 
-NetworkPolicies are organized by pod class, selected via labels (`daedalus.project/pod-class: daedalus | iris | themis | momus | clio | prometheus | hephaestus | pythia | talos | minotaur | typhon`):
+NetworkPolicies are organized by pod class, selected via labels (`zakros.project/pod-class: daedalus | iris | themis | momus | clio | prometheus | hephaestus | pythia | talos | minotaur | typhon`):
 
 | Pod class | Egress allowed to |
 |---|---|
@@ -1509,7 +1509,7 @@ No pod class's default egress list includes another pod — all cross-pod coordi
 
 **Phase 1 — IP-range allowlist via Proxmox firewall.**
 
-Daedalus and Iris are the only pod classes in Phase 1. Their allowlist is narrow: GitHub, specific package registries, Athena (Ollama for Iris; inference as granted for Daedalus), internal Crete services (Minos state API, Hermes, Ariadne). Pods do not need surface-API egress — Hermes on the Minos VM intermediates. Proxmox firewall enforces at IP/port granularity, using curated CIDR aliases:
+Daedalus and Iris are the only pod classes in Phase 1. Their allowlist is narrow: GitHub, specific package registries, Athena (Ollama for Iris; inference as granted for Zakros), internal Crete services (Minos state API, Hermes, Ariadne). Pods do not need surface-API egress — Hermes on the Minos VM intermediates. Proxmox firewall enforces at IP/port granularity, using curated CIDR aliases:
 
 - **GitHub IP ranges** fetched from `api.github.com/meta` and refreshed daily by a Minos-scheduled job; materialized as Proxmox firewall aliases (applies to both Labyrinth pods and the Minos VM)
 - **Package registry CIDRs** — published CDN ranges for Fastly (npm, PyPI), CloudFront (crates.io), Google (proxy.golang.org), etc.; refreshed weekly (applies to Labyrinth pods)
@@ -1526,7 +1526,7 @@ Charon (§3) lands in Phase 3 alongside Pythia and Talos, when pod classes diver
 Architecture:
 
 - Charon runs in a dedicated Proxmox LXC on Crete
-- Each pod class gets a dedicated Charon listening port (e.g., `:3128` Daedalus, `:3129` Pythia, `:3130` Talos); k3s NetworkPolicy restricts which pods may reach which port
+- Each pod class gets a dedicated Charon listening port (e.g., `:3128` Zakros, `:3129` Pythia, `:3130` Talos); k3s NetworkPolicy restricts which pods may reach which port
 - Pods receive `HTTP_PROXY` / `HTTPS_PROXY` env vars pointing to their class's Charon port
 - Proxmox firewall rules collapse to "Labyrinth → Charon only" for external egress; the broad CIDR allowlist moves inside Charon
 - Charon consults its per-class allowlist by SNI; allowed connections proxy straight through, denied connections are logged and refused
@@ -1570,7 +1570,7 @@ Ariadne is the log collection and archive service. Where Argus decides — consu
 
 | Service | Purpose |
 |---|---|
-| Vector | Log shipper and router — ingests from every Daedalus source, normalizes, forwards to Loki |
+| Vector | Log shipper and router — ingests from every Zakros source, normalizes, forwards to Loki |
 | Loki | Log store — indexed by label, compressed on disk, queryable via LogQL |
 
 ### What Ariadne Ingests
@@ -1593,7 +1593,7 @@ Retention policy is deferred — a concrete policy must be set before Ariadne is
 
 ## 18. Asclepius — Infrastructure Health Monitor
 
-**Phase:** Entire section is **Phase 3**. Phase 1 uses Proxmox's native VM/LXC monitoring plus systemd/launchd for per-service liveness; that's sufficient for a single-operator deployment. Asclepius lands when the operational surface grows enough that a Daedalus-specific health monitor with its own MCP surface and remediation actions earns its footprint.
+**Phase:** Entire section is **Phase 3**. Phase 1 uses Proxmox's native VM/LXC monitoring plus systemd/launchd for per-service liveness; that's sufficient for a single-operator deployment. Asclepius lands when the operational surface grows enough that a Zakros-specific health monitor with its own MCP surface and remediation actions earns its footprint.
 
 ### Role
 
@@ -1842,7 +1842,7 @@ Sections in this document carry **Phase** banners where their content varies by 
 
 ## 22. MVP Blockers
 
-The following must be fully designed and implemented before Daedalus Phase 1 can be considered operational. These are hard blockers for the MVP OpenClaw-replacement milestone in `roadmap.md §Phase 1`.
+The following must be fully designed and implemented before Zakros Phase 1 can be considered operational. These are hard blockers for the MVP OpenClaw-replacement milestone in `roadmap.md §Phase 1`.
 
 **Context injection and memory readout** — Addressed architecturally by Mnemosyne (§19). Remaining implementation work: the run-record schema (conversation log format, scratchpad dump, artifact references), the fact-extraction pipeline (how learned facts are distilled from run records into the semantic index), and the context-assembly strategy (what gets pulled into `context_ref` for a new task). Phase 1 ships with a simple extraction pipeline; Phase 2 refines.
 
@@ -1850,7 +1850,7 @@ The following must be fully designed and implemented before Daedalus Phase 1 can
 
 **Secret provider integration and credential scope** — Minos resolves credentials via a pluggable secret provider interface, never through hard-coded provider references in task payloads or plugin code. The full design for the provider contract, credential injection into pods at spawn time, and the Phase 1 credential set (GitHub App private key, `claude-code` credential, Hermes surface token) must be defined. A running agent with a stale or missing credential is a silent failure mode. Phase 1 ships two reference providers — Infisical (homelab deployment) and a file-backed provider (local development and plugin-interface testing without external dependencies).
 
-**GitHub App deployment and branch protection** — Addressed in §6 Credential Handling: Daedalus is deployed as a GitHub App with per-pod installation access tokens (1-hour TTL, scoped to the single target repo). Branch protection on the target repo remains the structural push prevention and must be verified at project configuration time. Remaining work: the exact verification policy and incident response for token compromise (both tracked in `security.md §5`).
+**GitHub App deployment and branch protection** — Addressed in §6 Credential Handling: Zakros is deployed as a GitHub App with per-pod installation access tokens (1-hour TTL, scoped to the single target repo). Branch protection on the target repo remains the structural push prevention and must be verified at project configuration time. Remaining work: the exact verification policy and incident response for token compromise (both tracked in `security.md §5`).
 
 **Admin identity bootstrap** — Phase 1 has no pairing flow. The single-admin `(surface, surface_id)` tuple must be configurable at install time (config file or CLI) and verified at first command intake. Iris's pass-through of surface-verified user identity must match the admin config for commissioning to succeed.
 

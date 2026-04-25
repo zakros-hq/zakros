@@ -9,14 +9,14 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/GoodOlClint/daedalus/minos/storage"
-	"github.com/GoodOlClint/daedalus/minos/storage/pgstore"
-	"github.com/GoodOlClint/daedalus/pkg/envelope"
+	"github.com/zakros-hq/zakros/minos/storage"
+	"github.com/zakros-hq/zakros/minos/storage/pgstore"
+	"github.com/zakros-hq/zakros/pkg/envelope"
 )
 
 // dsnEnv names the env var that opts this test suite in. Set to a DSN
 // against a disposable Postgres instance (e.g. `make dev-postgres`) to run.
-const dsnEnv = "DAEDALUS_TEST_POSTGRES_DSN"
+const dsnEnv = "ZAKROS_TEST_POSTGRES_DSN"
 
 func openTestStore(t *testing.T) (*pgstore.Store, *pgxpool.Pool) {
 	t.Helper()

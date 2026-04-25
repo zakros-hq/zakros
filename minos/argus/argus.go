@@ -28,10 +28,10 @@ import (
 
 	"github.com/google/uuid"
 
-	hermescore "github.com/GoodOlClint/daedalus/hermes/core"
-	"github.com/GoodOlClint/daedalus/minos/dispatch"
-	"github.com/GoodOlClint/daedalus/minos/storage"
-	"github.com/GoodOlClint/daedalus/pkg/audit"
+	hermescore "github.com/zakros-hq/zakros/hermes/core"
+	"github.com/zakros-hq/zakros/minos/dispatch"
+	"github.com/zakros-hq/zakros/minos/storage"
+	"github.com/zakros-hq/zakros/pkg/audit"
 )
 
 // Config controls the rules engine.

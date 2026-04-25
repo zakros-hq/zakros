@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	hermescore "github.com/GoodOlClint/daedalus/hermes/core"
-	"github.com/GoodOlClint/daedalus/minos/core"
-	"github.com/GoodOlClint/daedalus/minos/storage"
-	"github.com/GoodOlClint/daedalus/pkg/envelope"
+	hermescore "github.com/zakros-hq/zakros/hermes/core"
+	"github.com/zakros-hq/zakros/minos/core"
+	"github.com/zakros-hq/zakros/minos/storage"
+	"github.com/zakros-hq/zakros/pkg/envelope"
 )
 
 func TestParseCommissionHappy(t *testing.T) {

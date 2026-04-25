@@ -78,7 +78,7 @@ variable "lan_bridge" {
 
 variable "lan_cidr" {
   type        = string
-  description = "CIDR for the Daedalus LAN; OPNsense LAN address = first host"
+  description = "CIDR for the Zakros LAN; OPNsense LAN address = first host"
 }
 
 variable "dns_servers" {
@@ -93,7 +93,7 @@ variable "timezone" {
 
 variable "domain_suffix" {
   type    = string
-  default = "daedalus.local"
+  default = "zakros.local"
 }
 
 # Operator access.

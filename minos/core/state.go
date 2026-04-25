@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/GoodOlClint/daedalus/minos/storage"
+	"github.com/zakros-hq/zakros/minos/storage"
 )
 
 // requireIrisAuth gates the read-only state API and the Hermes pull

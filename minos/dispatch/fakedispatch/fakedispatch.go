@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/GoodOlClint/daedalus/minos/dispatch"
+	"github.com/zakros-hq/zakros/minos/dispatch"
 )
 
 // Pod captures what the fake dispatcher remembers about a spawned pod.

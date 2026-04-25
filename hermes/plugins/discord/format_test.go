@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/GoodOlClint/daedalus/hermes/core"
+	"github.com/zakros-hq/zakros/hermes/core"
 )
 
 func TestFormatMessageShape(t *testing.T) {

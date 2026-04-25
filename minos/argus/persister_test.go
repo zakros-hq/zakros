@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/GoodOlClint/daedalus/minos/argus"
+	"github.com/zakros-hq/zakros/minos/argus"
 )
 
 func makeArgusState(now time.Time) *argus.State {
@@ -15,7 +15,7 @@ func makeArgusState(now time.Time) *argus.State {
 		TaskID:        uuid.New(),
 		RunID:         uuid.New(),
 		PodName:       "daedalus-test-pod",
-		Namespace:     "daedalus",
+		Namespace:     "zakros",
 		StartedAt:     now,
 		LastHeartbeat: now,
 		MaxWallClock:  10 * time.Minute,

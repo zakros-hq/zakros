@@ -16,8 +16,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/GoodOlClint/daedalus/minos/core"
-	"github.com/GoodOlClint/daedalus/pkg/envelope"
+	"github.com/zakros-hq/zakros/minos/core"
+	"github.com/zakros-hq/zakros/pkg/envelope"
 )
 
 // Environment variables read by minosctl. Keeping the token out of argv

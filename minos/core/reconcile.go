@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 
-	"github.com/GoodOlClint/daedalus/minos/dispatch"
-	"github.com/GoodOlClint/daedalus/minos/storage"
-	"github.com/GoodOlClint/daedalus/pkg/audit"
+	"github.com/zakros-hq/zakros/minos/dispatch"
+	"github.com/zakros-hq/zakros/minos/storage"
+	"github.com/zakros-hq/zakros/pkg/audit"
 )
 
 // Reconcile walks non-terminal tasks in storage and reconciles their

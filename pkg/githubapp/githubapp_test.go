@@ -16,7 +16,7 @@ import (
 
 	gojwt "github.com/golang-jwt/jwt/v5"
 
-	"github.com/GoodOlClint/daedalus/pkg/githubapp"
+	"github.com/zakros-hq/zakros/pkg/githubapp"
 )
 
 // genRSAKeyPEM returns a fresh RSA key encoded as PKCS#1 PEM — matches the

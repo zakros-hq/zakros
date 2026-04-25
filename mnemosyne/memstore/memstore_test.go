@@ -9,8 +9,8 @@ import (
 
 	"github.com/google/uuid"
 
-	mcore "github.com/GoodOlClint/daedalus/mnemosyne/core"
-	"github.com/GoodOlClint/daedalus/mnemosyne/memstore"
+	mcore "github.com/zakros-hq/zakros/mnemosyne/core"
+	"github.com/zakros-hq/zakros/mnemosyne/memstore"
 )
 
 func newRun(project string, outcome mcore.Outcome, summary string, at time.Time) *mcore.RunRecord {

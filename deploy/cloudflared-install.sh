@@ -7,7 +7,7 @@
 #
 # Prerequisites (one-time, in Cloudflare Zero Trust dashboard):
 #   1. Zero Trust → Networks → Tunnels → Create a tunnel
-#   2. Name it (e.g. "daedalus"), pick Cloudflared, copy the token
+#   2. Name it (e.g. "zakros"), pick Cloudflared, copy the token
 #      shown on the "Install and run a connector" screen
 #   3. Public Hostname → add subdomain → service: http://localhost:8080
 #      (point the /webhooks/github path at minos)
@@ -17,16 +17,16 @@
 #
 # Env:
 #   MINOS_HOST           default 172.16.140.101
-#   SSH_USER             default daedalus
+#   SSH_USER             default zakros
 #   CLOUDFLARED_TOKEN    optional — tunnel token. Defaults to the
 #                        `cloudflared/tunnel-token` entry in
 #                        deploy/secrets.json so the token lives alongside
-#                        the rest of the Daedalus credentials.
+#                        the rest of the Zakros credentials.
 
 set -euo pipefail
 
 : "${MINOS_HOST:=172.16.140.101}"
-: "${SSH_USER:=daedalus}"
+: "${SSH_USER:=zakros}"
 
 # Fall back to secrets.json if env var isn't set.
 if [ -z "${CLOUDFLARED_TOKEN:-}" ]; then

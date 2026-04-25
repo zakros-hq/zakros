@@ -11,7 +11,7 @@ import (
 
 	"github.com/google/uuid"
 
-	mcore "github.com/GoodOlClint/daedalus/mnemosyne/core"
+	mcore "github.com/zakros-hq/zakros/mnemosyne/core"
 )
 
 // Store is the in-memory implementation.

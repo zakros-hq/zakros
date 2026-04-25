@@ -8,16 +8,16 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	hermescore "github.com/GoodOlClint/daedalus/hermes/core"
-	"github.com/GoodOlClint/daedalus/hermes/plugins/fakeplugin"
-	"github.com/GoodOlClint/daedalus/minos/core"
-	"github.com/GoodOlClint/daedalus/minos/dispatch/fakedispatch"
-	"github.com/GoodOlClint/daedalus/minos/storage"
-	"github.com/GoodOlClint/daedalus/minos/storage/memstore"
-	"github.com/GoodOlClint/daedalus/pkg/audit"
-	"github.com/GoodOlClint/daedalus/pkg/envelope"
+	hermescore "github.com/zakros-hq/zakros/hermes/core"
+	"github.com/zakros-hq/zakros/hermes/plugins/fakeplugin"
+	"github.com/zakros-hq/zakros/minos/core"
+	"github.com/zakros-hq/zakros/minos/dispatch/fakedispatch"
+	"github.com/zakros-hq/zakros/minos/storage"
+	"github.com/zakros-hq/zakros/minos/storage/memstore"
+	"github.com/zakros-hq/zakros/pkg/audit"
+	"github.com/zakros-hq/zakros/pkg/envelope"
 
-	"github.com/GoodOlClint/daedalus/cerberus/core/replay"
+	"github.com/zakros-hq/zakros/cerberus/core/replay"
 )
 
 // newTestServerWithHermes builds a server rig with a fake Hermes plugin

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/GoodOlClint/daedalus/mnemosyne/core"
+	"github.com/zakros-hq/zakros/mnemosyne/core"
 )
 
 func TestSanitizeRedactsKnownValues(t *testing.T) {

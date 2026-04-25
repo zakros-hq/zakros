@@ -1,6 +1,6 @@
-# Daedalus deployment scripts
+# Zakros deployment scripts
 
-Bootstrap scripts for the four Daedalus guests after Terraform has
+Bootstrap scripts for the four Zakros guests after Terraform has
 provisioned them on Crete. All scripts are idempotent — safe to re-run
 after fixing config or adjusting env.
 
@@ -68,19 +68,19 @@ Then run migrations from your workstation:
 
 ```sh
 go install github.com/pressly/goose/v3/cmd/goose@latest
-DSN="postgres://daedalus:$POSTGRES_PASSWORD@172.16.140.100:5432/daedalus?sslmode=disable"
+DSN="postgres://zakros:$POSTGRES_PASSWORD@172.16.140.100:5432/zakros?sslmode=disable"
 ~/go/bin/goose -dir minos/storage/pgstore/migrations postgres "$DSN" up
 ```
 
 ## 2. k3s on labyrinth (vmid 212)
 
 ```sh
-ssh daedalus@172.16.140.102 'sudo bash -s' < deploy/k3s-install.sh
+ssh zakros@172.16.140.102 'sudo bash -s' < deploy/k3s-install.sh
 
 # pull kubeconfig back
-scp daedalus@172.16.140.102:/etc/rancher/k3s/k3s.yaml ~/.kube/daedalus.yaml
-sed -i '' 's/127.0.0.1/172.16.140.102/' ~/.kube/daedalus.yaml  # drop '' on Linux
-KUBECONFIG=~/.kube/daedalus.yaml kubectl get nodes
+scp zakros@172.16.140.102:/etc/rancher/k3s/k3s.yaml ~/.kube/zakros.yaml
+sed -i '' 's/127.0.0.1/172.16.140.102/' ~/.kube/zakros.yaml  # drop '' on Linux
+KUBECONFIG=~/.kube/zakros.yaml kubectl get nodes
 ```
 
 ## 3. Worker images → labyrinth's containerd
@@ -89,7 +89,7 @@ KUBECONFIG=~/.kube/daedalus.yaml kubectl get nodes
 LABYRINTH_HOST=172.16.140.102 deploy/images-push.sh
 ```
 
-Builds `daedalus/claude-code:local` + `daedalus/argus-sidecar:local` locally,
+Builds `zakros/claude-code:local` + `zakros/argus-sidecar:local` locally,
 scps tars, imports into k3s's containerd. No remote registry needed.
 
 ## 4. Minos on minos VM (vmid 210)
@@ -119,7 +119,7 @@ Then:
 deploy/minos-install.sh
 
 # tail logs
-ssh daedalus@172.16.140.101 'sudo journalctl -u minos -f'
+ssh zakros@172.16.140.101 'sudo journalctl -u minos -f'
 ```
 
 The script builds `bin/minos`, scps it + config + secrets + kubeconfig,
@@ -133,7 +133,7 @@ daemon without port-forwarding or public IPs.
 
 One-time in the Cloudflare Zero Trust dashboard:
 1. Networks → Tunnels → **Create a tunnel** (Cloudflared flavor), name
-   it `daedalus`, copy the token on the "Install and run a connector"
+   it `zakros`, copy the token on the "Install and run a connector"
    screen.
 2. **Public Hostname** tab → Add public hostname → pick a subdomain on
    a domain you control, service type `HTTP`, URL `localhost:8080`.
@@ -185,7 +185,7 @@ The claude-code worker image consumes two credentials at runtime:
   GitHub → Settings → Developer settings → Personal access tokens →
   Fine-grained tokens → Generate new token. Permissions: Contents
   read/write, Pull requests read/write, Metadata read. Scope to the
-  repos you want Daedalus to commit to.
+  repos you want Zakros to commit to.
 
   Paste into `deploy/secrets.json` → `github/pat.value`.
 
@@ -210,7 +210,7 @@ Minos is running (step 4):
 deploy/iris-install.sh
 
 # tail logs
-KUBECONFIG=~/.kube/daedalus.yaml kubectl -n daedalus logs -f deploy/iris
+KUBECONFIG=~/.kube/zakros.yaml kubectl -n zakros logs -f deploy/iris
 ```
 
 The script reads `deploy/config.json` + `deploy/secrets.json`, renders

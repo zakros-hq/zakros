@@ -4,10 +4,10 @@ import (
 	"context"
 	"testing"
 
-	"github.com/GoodOlClint/daedalus/minos/core"
-	"github.com/GoodOlClint/daedalus/minos/dispatch"
-	"github.com/GoodOlClint/daedalus/minos/storage"
-	"github.com/GoodOlClint/daedalus/pkg/envelope"
+	"github.com/zakros-hq/zakros/minos/core"
+	"github.com/zakros-hq/zakros/minos/dispatch"
+	"github.com/zakros-hq/zakros/minos/storage"
+	"github.com/zakros-hq/zakros/pkg/envelope"
 )
 
 // commissionRunning returns a task dispatched (StateRunning) through the
@@ -45,7 +45,7 @@ func TestReconcileMarksFailedOnMissingPod(t *testing.T) {
 	task := commissionRunning(t, kit, "missing-pod")
 
 	// Simulate a pod that disappeared while Minos was down.
-	_ = kit.dispatcher.DeletePod(context.Background(), "daedalus", *task.PodName)
+	_ = kit.dispatcher.DeletePod(context.Background(), "zakros", *task.PodName)
 
 	if err := kit.server.Reconcile(context.Background()); err != nil {
 		t.Fatalf("reconcile: %v", err)
@@ -63,7 +63,7 @@ func TestReconcileHibernatesSucceededPod(t *testing.T) {
 	// Simulate the pod completing (PR opened, process exited) while
 	// Minos was down — reconcile should move the task to
 	// awaiting-review just as Argus would on live observation.
-	kit.dispatcher.SetPhase("daedalus", *task.PodName, dispatch.PhaseSucceeded)
+	kit.dispatcher.SetPhase("zakros", *task.PodName, dispatch.PhaseSucceeded)
 
 	if err := kit.server.Reconcile(context.Background()); err != nil {
 		t.Fatalf("reconcile: %v", err)
@@ -77,7 +77,7 @@ func TestReconcileHibernatesSucceededPod(t *testing.T) {
 func TestReconcileFailsOnFailedPod(t *testing.T) {
 	kit := newTestServer(t)
 	task := commissionRunning(t, kit, "pod-failed")
-	kit.dispatcher.SetPhase("daedalus", *task.PodName, dispatch.PhaseFailed)
+	kit.dispatcher.SetPhase("zakros", *task.PodName, dispatch.PhaseFailed)
 
 	if err := kit.server.Reconcile(context.Background()); err != nil {
 		t.Fatalf("reconcile: %v", err)
@@ -96,7 +96,7 @@ func TestReconcileLeavesAwaitingReviewAlone(t *testing.T) {
 		t.Fatalf("transition: %v", err)
 	}
 	// Drop the pod — hibernated tasks have no pod.
-	_ = kit.dispatcher.DeletePod(context.Background(), "daedalus", *task.PodName)
+	_ = kit.dispatcher.DeletePod(context.Background(), "zakros", *task.PodName)
 
 	if err := kit.server.Reconcile(context.Background()); err != nil {
 		t.Fatalf("reconcile: %v", err)

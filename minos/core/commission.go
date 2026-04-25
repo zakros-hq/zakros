@@ -9,12 +9,12 @@ import (
 
 	"github.com/google/uuid"
 
-	hermescore "github.com/GoodOlClint/daedalus/hermes/core"
-	"github.com/GoodOlClint/daedalus/minos/dispatch"
-	"github.com/GoodOlClint/daedalus/minos/storage"
-	"github.com/GoodOlClint/daedalus/pkg/audit"
-	"github.com/GoodOlClint/daedalus/pkg/envelope"
-	"github.com/GoodOlClint/daedalus/pkg/jwt"
+	hermescore "github.com/zakros-hq/zakros/hermes/core"
+	"github.com/zakros-hq/zakros/minos/dispatch"
+	"github.com/zakros-hq/zakros/minos/storage"
+	"github.com/zakros-hq/zakros/pkg/audit"
+	"github.com/zakros-hq/zakros/pkg/envelope"
+	"github.com/zakros-hq/zakros/pkg/jwt"
 )
 
 // CommissionRequest is the operator- or surface-facing input that drives

@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/GoodOlClint/daedalus/minos/core"
+	"github.com/zakros-hq/zakros/minos/core"
 )
 
 func writeConfig(t *testing.T, body string) string {
@@ -21,7 +21,7 @@ func writeConfig(t *testing.T, body string) string {
 func TestLoadConfigValid(t *testing.T) {
 	path := writeConfig(t, `{
   "listen_addr": ":8080",
-  "database_url": "postgres://localhost/daedalus",
+  "database_url": "postgres://localhost/zakros",
   "bearer_secret_ref": "minos-bearer-secret",
   "admin_token_ref": "minos-admin-token",
   "github_webhook_secret_ref": "github-webhook-secret",
@@ -29,7 +29,7 @@ func TestLoadConfigValid(t *testing.T) {
   "project": {
     "id": "test",
     "backend": "claude-code",
-    "plugin_image": "ghcr.io/example/daedalus-claude-code:latest",
+    "plugin_image": "ghcr.io/example/zakros-claude-code:latest",
     "default_budget": {
       "max_tokens": 500000,
       "max_wall_clock_seconds": 3600,

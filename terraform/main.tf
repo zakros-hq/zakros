@@ -1,4 +1,4 @@
-# Flat network: all Daedalus guests attach to vmbr0 with VLAN tag 130
+# Flat network: all Zakros guests attach to vmbr0 with VLAN tag 130
 # (the existing homelab VLAN), DHCP for addressing. Homelab router
 # handles routing/NAT/DNS. No OPNsense, no SDN, no isolation.
 

@@ -1,10 +1,10 @@
 #!/bin/bash
-# Bootstrap a Postgres 17 + pgvector on the Daedalus Postgres LXC.
+# Bootstrap a Postgres 17 + pgvector on the Zakros Postgres LXC.
 # Idempotent: safe to re-run. Reads env:
-#   POSTGRES_PASSWORD  required — set the daedalus role's password
-#   POSTGRES_ALLOWED_CIDR  default 0.0.0.0/0 — pg_hba network for daedalus role
-#   POSTGRES_DB        default 'daedalus'
-#   POSTGRES_USER      default 'daedalus'
+#   POSTGRES_PASSWORD  required — set the zakros role's password
+#   POSTGRES_ALLOWED_CIDR  default 0.0.0.0/0 — pg_hba network for zakros role
+#   POSTGRES_DB        default 'zakros'
+#   POSTGRES_USER      default 'zakros'
 #
 # Run from the operator's workstation:
 #   POSTGRES_PASSWORD=... ssh root@<crete-ip> "pct exec 211 -- bash" < deploy/postgres-bootstrap.sh
@@ -15,8 +15,8 @@ set -euo pipefail
 
 : "${POSTGRES_PASSWORD:?must be set}"
 : "${POSTGRES_ALLOWED_CIDR:=0.0.0.0/0}"
-: "${POSTGRES_DB:=daedalus}"
-: "${POSTGRES_USER:=daedalus}"
+: "${POSTGRES_DB:=zakros}"
+: "${POSTGRES_USER:=zakros}"
 
 PG_MAJOR=17
 

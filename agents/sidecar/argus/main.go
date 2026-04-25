@@ -1,4 +1,4 @@
-// Command daedalus-argus-sidecar runs as a sidecar container in every
+// Command zakros-argus-sidecar runs as a sidecar container in every
 // Daedalus pod and emits a heartbeat to Minos's /tasks/{id}/heartbeat
 // endpoint on a configurable interval. The sidecar is separate from the
 // worker backend per architecture.md §8 Pod Sidecars so a hung or
@@ -24,11 +24,11 @@ func main() {
 	timeout := flag.Duration("timeout", 5*time.Second, "per-heartbeat HTTP timeout")
 	flag.Parse()
 
-	minosURL := strings.TrimRight(os.Getenv("DAEDALUS_MINOS_URL"), "/")
-	taskID := os.Getenv("DAEDALUS_TASK_ID")
+	minosURL := strings.TrimRight(os.Getenv("ZAKROS_MINOS_URL"), "/")
+	taskID := os.Getenv("ZAKROS_TASK_ID")
 	token := os.Getenv("MCP_AUTH_TOKEN")
 	if minosURL == "" || taskID == "" || token == "" {
-		log.Fatal("DAEDALUS_MINOS_URL, DAEDALUS_TASK_ID, and MCP_AUTH_TOKEN must all be set")
+		log.Fatal("ZAKROS_MINOS_URL, ZAKROS_TASK_ID, and MCP_AUTH_TOKEN must all be set")
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)

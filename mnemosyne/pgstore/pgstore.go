@@ -12,7 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	mcore "github.com/GoodOlClint/daedalus/mnemosyne/core"
+	mcore "github.com/zakros-hq/zakros/mnemosyne/core"
 )
 
 // Store is the Postgres implementation.

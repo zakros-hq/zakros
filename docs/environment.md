@@ -1,4 +1,4 @@
-# Project Daedalus — Environment Catalog
+# Project Zakros — Environment Catalog
 
 *Version 0.1 — Draft*
 
@@ -23,10 +23,10 @@ This file exists so that:
 
 Specific hardware: Intel i9-13900H, 96GB DDR5, 2× 1TB NVMe (ZFS mirror), third M.2 reserved, multi-NIC (2× 2.5Gb + 2× 10Gb), Proxmox VE 9.x.
 
-What Daedalus depends on (independent of the specific device):
-- A hypervisor host that can run the Daedalus VMs and LXC containers listed in `architecture.md §4` with the stated resource allocations.
+What Zakros depends on (independent of the specific device):
+- A hypervisor host that can run the Zakros VMs and LXC containers listed in `architecture.md §4` with the stated resource allocations.
 - Storage with redundancy sufficient to survive a single-drive failure of the VM pool.
-- Proxmox snapshots for fast rollback. Off-host backup is not in the Daedalus scope; state is recoverable from external sources (GitHub, Infisical, the configured Hermes surface).
+- Proxmox snapshots for fast rollback. Off-host backup is not in the Zakros scope; state is recoverable from external sources (GitHub, Infisical, the configured Hermes surface).
 
 ### Athena — Mac Studio M4 Max
 
@@ -36,7 +36,7 @@ Specific hardware: Apple Mac Studio (part number Z1CD9LL/A), M4 Max SoC, 40-core
 
 **Planned expansion:** Athena is expected to grow into a Mac Studio cluster built on M5 Ultra hardware, interconnected over Thunderbolt 5 with RDMA (requires macOS 26.2 or later). The cluster will scale inference capacity and model residency but does not change Athena's architectural contract — it remains a passive oracle reachable on the documented service ports.
 
-What Daedalus depends on:
+What Zakros depends on:
 - An inference node reachable on specific ports (Ollama 11434, embedding 8400, Qdrant 6333, whisper on-demand).
 - The node does not host agents, workspaces, case data, or source code.
 - The node does not initiate connections to Crete-hosted resources except for one-way log shipping to Ariadne (the documented carveout; outbound to external model registries is also permitted).
@@ -59,9 +59,9 @@ Contract: Crete must be able to terminate multiple VLANs internally and expose t
 
 **Referenced in:** `architecture.md §4`
 
-pfSense handles broader homelab VLAN policy and ingress routing. Daedalus does not depend on specific pfSense rules for its own isolation — the Proxmox firewall on Crete holds all Daedalus egress allowlist and inbound rules. A deployment without pfSense can rely entirely on the hypervisor firewall for Daedalus isolation.
+pfSense handles broader homelab VLAN policy and ingress routing. Zakros does not depend on specific pfSense rules for its own isolation — the Proxmox firewall on Crete holds all Zakros egress allowlist and inbound rules. A deployment without pfSense can rely entirely on the hypervisor firewall for Zakros isolation.
 
-Contract: none required for Daedalus. pfSense remains present in this homelab for reasons outside the project scope.
+Contract: none required for Zakros. pfSense remains present in this homelab for reasons outside the project scope.
 
 ### 12-VLAN Homelab Architecture
 
@@ -98,7 +98,7 @@ Phase 1 configures **one** Hermes surface plugin — whichever the operator uses
 
 Contract: a chat platform with bot support, per-thread or per-chat posting, and either webhook-capable inbound routing or an outbound-gateway/long-poll pattern for event delivery. The Hermes plugin contract accommodates both threaded and flat surfaces; Phase 1 ships threaded-only (Discord), and the flat-surface tradeoffs below apply once a Phase 2 flat-surface plugin (Telegram, iMessage, SMS) lands.
 
-**Flat vs. threaded surface — Phase 2+ functionality tradeoff.** Daedalus assumes one task-thread per task. On threaded surfaces (Discord, Slack, Teams, Matrix), each task gets its own thread and cross-task message isolation is preserved by the surface. On **flat surfaces** (Telegram, iMessage, SMS) there are no threads — `thread_ref` collapses to the chat or conversation ID, and every task commissioned from that chat shares it. Consequences the operator must accept when choosing a flat surface:
+**Flat vs. threaded surface — Phase 2+ functionality tradeoff.** Zakros assumes one task-thread per task. On threaded surfaces (Discord, Slack, Teams, Matrix), each task gets its own thread and cross-task message isolation is preserved by the surface. On **flat surfaces** (Telegram, iMessage, SMS) there are no threads — `thread_ref` collapses to the chat or conversation ID, and every task commissioned from that chat shares it. Consequences the operator must accept when choosing a flat surface:
 
 - A user with access to the chat can read every task's narration, not just the one they commissioned
 - Argus escalations, hibernation notices, and task summaries all land in the same chat and can drown routine work under incident noise
@@ -111,15 +111,15 @@ Phase 2 flat-surface plugins are supported; the project does not attempt to pape
 
 **Referenced in:** `architecture.md §6`, `§8`, `§22`; `security.md §5`
 
-Daedalus assumes GitHub as the code host — PATs, webhooks, branch protection, PR events drive the agent lifecycle.
+Zakros assumes GitHub as the code host — PATs, webhooks, branch protection, PR events drive the agent lifecycle.
 
-Contract: a Git host that supports scoped machine credentials, webhook delivery with HMAC signatures, and branch-level protection rules that Daedalus can treat as the enforcement surface for push restrictions.
+Contract: a Git host that supports scoped machine credentials, webhook delivery with HMAC signatures, and branch-level protection rules that Zakros can treat as the enforcement surface for push restrictions.
 
 ### Anthropic Workspace (Claude API)
 
 **Referenced in:** `architecture.md §6 Credential Handling`, `§7 Phase 1 budget posture`, `§16 Egress Granularity`; `security.md §3`, `§13`
 
-Specific Anthropic workspace backs the operator's `claude-code` subscription. Phase 1 Daedalus pods invoke `claude-code` directly against this workspace; the API key or OAuth token is injected into every Daedalus pod at spawn.
+Specific Anthropic workspace backs the operator's `claude-code` subscription. Phase 1 Daedalus pods invoke `claude-code` directly against this workspace; the API key or OAuth token is injected into every Zakros pod at spawn.
 
 **Required deployment settings (Phase 1):**
 
@@ -152,7 +152,7 @@ Contract: the architecture reserves Hydra VM workspaces for full-OS tasks. The s
 
 **Referenced in:** `architecture.md §21`, `§23`
 
-Pre-existing agent implementation that Daedalus replaces. Phase 1 calls for migrating its behavior into the Minos/Argus separation.
+Pre-existing agent implementation that Zakros replaces. Phase 1 calls for migrating its behavior into the Minos/Argus separation.
 
 Contract: migration-specific; not relevant to any new deployment.
 
@@ -162,7 +162,7 @@ Contract: migration-specific; not relevant to any new deployment.
 
 For clarity, the following are architectural decisions that do not belong in this catalog:
 
-- Component taxonomy (Minos, Argus, Daedalus, Labyrinth, Athena as roles)
+- Component taxonomy (Minos, Argus, Zakros, Labyrinth, Athena as roles)
 - MCP broker pattern and capability composition
 - Pod-per-agent substrate in k3s
 - Thread sidecar interface (`post_status`, `post_thinking`, etc.) proxied through Hermes

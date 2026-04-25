@@ -1,4 +1,4 @@
-# Project Daedalus — Phase 2 Plan
+# Project Zakros — Phase 2 Plan
 
 *Version 0.1 — Draft*
 
@@ -22,7 +22,7 @@ From `roadmap.md §Phase 2 acceptance`:
 2. A second LLM provider plugin works alongside Anthropic, with Apollo-reported usage.
 3. A high-blast scope invocation from a pod blocks until the operator approves in-thread.
 4. An injected prompt in a PR comment does not escalate to a high-blast MCP call.
-5. Momus reviews every Daedalus-opened PR before it reaches the human reviewer, with review comments posted to the PR.
+5. Momus reviews every Zakros-opened PR before it reaches the human reviewer, with review comments posted to the PR.
 6. Themis decomposes a multi-task operator request from Iris into an ordered plan, commissions each task through Minos, and reports progress back through Iris.
 7. An Argus escalation reaches Themis, is classified (halt / re-plan / escalate-to-human), and the corresponding Minos action fires without operator intervention for the re-plan case.
 8. Clio opens a `docs/**` PR after a feature PR merges; Hephaestus opens a draft ADR in `docs/adr/proposed/**` without ever writing to `docs/adr/accepted/**`; Prometheus cuts a release and is blocked on production promotion pending the operator's confirmation token.
@@ -73,7 +73,7 @@ This preserves the architecture's explicit separation between MCP broker scopes 
 
 ### Hecate: adopt OpenBao + vault-mcp-server
 
-Per `build-vs-adopt.md §hecate`, Phase 2 adopts `hashicorp/vault-mcp-server` with **OpenBao** (MPL-2.0, LF-governed, API-compatible with Vault 1.14) as the backend. OpenBao runs in its own Proxmox LXC on Crete — one more service to operate, but per-credential Vault policies give the only upstream auth model that composes with Daedalus JWT scopes (`credentials.fetch:<ref>` ↔ one policy per credential).
+Per `build-vs-adopt.md §hecate`, Phase 2 adopts `hashicorp/vault-mcp-server` with **OpenBao** (MPL-2.0, LF-governed, API-compatible with Vault 1.14) as the backend. OpenBao runs in its own Proxmox LXC on Crete — one more service to operate, but per-credential Vault policies give the only upstream auth model that composes with Zakros JWT scopes (`credentials.fetch:<ref>` ↔ one policy per credential).
 
 ### Cerberus: library with verifier plugins, no broker extraction
 
@@ -114,13 +114,13 @@ Prerequisites is a parallel track, not a gate on code work. Slices F and G devel
 
 ### 3.1 OpenBao LXC on Crete
 
-A new Proxmox LXC for OpenBao joins the existing four Daedalus guests. Extend `terraform/` with an `openbao` guest definition:
+A new Proxmox LXC for OpenBao joins the existing four Zakros guests. Extend `terraform/` with an `openbao` guest definition:
 
 | Guest | Type | vCPU | RAM | Disk | VLANs | Base image |
 |---|---|---|---|---|---|---|
 | `openbao` | LXC | 2 | 4GB | 50GB | VLAN 140 | Debian 12 template (matches Postgres LXC) |
 
-OpenBao runs as a systemd service in the LXC. Raft storage backend on local disk; Proxmox snapshots are the recovery floor per existing homelab pattern. Initial unseal keys and root token generated out-of-band and stored in the operator's workstation secret store. Vault policies for Daedalus scopes are managed declaratively via `deploy/openbao/policies/` — one file per `credentials.fetch:<ref>` scope.
+OpenBao runs as a systemd service in the LXC. Raft storage backend on local disk; Proxmox snapshots are the recovery floor per existing homelab pattern. Initial unseal keys and root token generated out-of-band and stored in the operator's workstation secret store. Vault policies for Zakros scopes are managed declaratively via `deploy/openbao/policies/` — one file per `credentials.fetch:<ref>` scope.
 
 Exit criteria: `openbao` LXC reachable, OpenBao initialized and unsealed, operator workstation holds recovery keys + root token, baseline policies applied.
 
@@ -134,7 +134,7 @@ Phase 1 Discord app ("Hermes") gains a Slack counterpart. Register a Slack app f
 
 App webhook URL points at the Cerberus public hostname (same Cloudflare Tunnel Phase 1 already runs). Signing secret stored via the secret provider.
 
-Exit criteria: Slack app installed in operator's workspace, signing secret in secrets backend, `/commission` slash command registered and pointing at Daedalus.
+Exit criteria: Slack app installed in operator's workspace, signing secret in secrets backend, `/commission` slash command registered and pointing at Zakros.
 
 ### 3.3 VM topology revisit (optional)
 
@@ -161,7 +161,7 @@ Two downstream migrations follow from this interim backend pick — both are sma
 
 ### Tasks
 
-1. **Iris pod image.** Long-running pod spec with `daedalus.project/pod-class: iris` label. Backend: Anthropic API client (same credential injection pattern as Phase 1 `claude-code` pods). Conversation state persisted to Postgres `iris.conversations` schema.
+1. **Iris pod image.** Long-running pod spec with `zakros.project/pod-class: iris` label. Backend: Anthropic API client (same credential injection pattern as Phase 1 `claude-code` pods). Conversation state persisted to Postgres `iris.conversations` schema.
 
 2. **Minos state API.** `GET /state/tasks`, `GET /state/queue`, `GET /state/recent`. Bearer-token auth (Phase 1 posture; swaps to JWT in Slice F).
 
@@ -183,7 +183,7 @@ Phase 1 acceptance is now fully closed, with the backend-is-Claude interim expli
 
 ## 5. Slice F — "JWT foundation + github-shim"
 
-**Proves:** every MCP call in the system is cryptographically bound to a Minos-signed per-pod token with scope enforcement. GitHub broker is an adopted upstream MCP behind a Daedalus shim that mints installation tokens from JWT scopes. Closes the Phase 1 PAT workaround.
+**Proves:** every MCP call in the system is cryptographically bound to a Minos-signed per-pod token with scope enforcement. GitHub broker is an adopted upstream MCP behind a Zakros shim that mints installation tokens from JWT scopes. Closes the Phase 1 PAT workaround.
 
 **Scope:** Ed25519 JWT signing + verification as the MCP broker auth primitive, github-mcp-server adoption behind a shim per `build-vs-adopt.md §github`. HMAC bearer paths are deleted (greenfield).
 
@@ -208,10 +208,10 @@ Phase 1 acceptance is now fully closed, with the backend-is-Claude interim expli
    - `capabilities.mcp_endpoints[].scopes` mirrors the JWT claim (documentation + self-check)
 
 5. **github-mcp-server shim.**
-   - Daedalus-supervised subprocess per pod session
+   - Zakros-supervised subprocess per pod session
    - JWT verification at shim ingress
    - Mints GitHub App installation tokens per-call from the JWT's `repo_url` scope (single-repo scope per `architecture.md §6 Credential Handling`)
-   - Maps Daedalus verbs (`pr.create`, `pr.comment`, `clone`, `push`) to upstream GitHub MCP tool calls
+   - Maps Zakros verbs (`pr.create`, `pr.comment`, `clone`, `push`) to upstream GitHub MCP tool calls
    - Replaces the Phase 1 PAT path (commit `86f74cb`) — the PAT credential is removed from the secrets backend
 
 6. **Phase 1 HMAC paths deleted.**
@@ -357,7 +357,7 @@ Phase 1 acceptance is now fully closed, with the backend-is-Claude interim expli
 
 **Proves:** every consumer (pods and Minos-VM broker subprocesses) fetches credentials from Hecate on JWT-authenticated pull. In-pod credential refresh works across the GitHub App installation token's 1-hour TTL. OpenBao is the Vault-compatible backend.
 
-**Scope:** OpenBao deployment, `hashicorp/vault-mcp-server` as a Daedalus-supervised subprocess behind Hecate, per-credential Vault policies, in-pod refresh client, migration of the Claude credential from Minos-push to Hecate-pull.
+**Scope:** OpenBao deployment, `hashicorp/vault-mcp-server` as a Zakros-supervised subprocess behind Hecate, per-credential Vault policies, in-pod refresh client, migration of the Claude credential from Minos-push to Hecate-pull.
 
 ### Tasks
 
@@ -409,7 +409,7 @@ Phase 1 acceptance is now fully closed, with the backend-is-Claude interim expli
 
 ## 9. Slice H2 — "Apollo LLM broker" *(parallel with H1, I; after J)*
 
-**Proves:** Anthropic traffic from every Daedalus pod flows through Apollo; non-forgeable token counts feed Argus; per-project rate limits fire before the Anthropic workspace spend cap. Closes `security.md §13` Phase 1 cost-ceiling.
+**Proves:** Anthropic traffic from every Zakros pod flows through Apollo; non-forgeable token counts feed Argus; per-project rate limits fire before the Anthropic workspace spend cap. Closes `security.md §13` Phase 1 cost-ceiling.
 
 **Scope:** Apollo core binary, per-provider subprocess plugins (strong isolation per §2 D4), non-forgeable usage tracking via provider response headers, per-project caps, `claude-code` pod migration from direct Anthropic calls to Apollo calls.
 
@@ -450,7 +450,7 @@ Phase 1 acceptance is now fully closed, with the backend-is-Claude interim expli
 
 ### Acceptance checkpoint for Slice H2
 
-- A commissioned task routes all Anthropic traffic through Apollo; no pod (Daedalus workers or Iris) has direct Anthropic CDN egress
+- A commissioned task routes all Anthropic traffic through Apollo; no pod (Zakros workers or Iris) has direct Anthropic CDN egress
 - A runaway-loop test pod is terminated by Argus on per-project token-cap breach *before* the Anthropic workspace spend cap trips (closes `security.md §13`)
 - A synthetic second-provider plugin (OpenAI stub) loads into Apollo, accepts a JWT with `apollo.openai.gpt-*` scope, and the test pod commissions through it successfully
 - Anthropic API key no longer appears in any pod's environment; a compromised pod cannot exfiltrate provider credentials
@@ -578,7 +578,7 @@ Phase 1 acceptance is now fully closed, with the backend-is-Claude interim expli
 ### Tasks
 
 1. **Themis pod image.**
-   - New `agents/themis/` pod image, long-lived with `daedalus.project/pod-class: themis` label
+   - New `agents/themis/` pod image, long-lived with `zakros.project/pod-class: themis` label
    - Backend: local inference via Ollama on Athena (qwen3.5:27b per `architecture.md §11 Backend`)
    - One Themis pod per project (Phase 2 is single-project; multi-project lands in Phase 3)
 
@@ -622,7 +622,7 @@ Phase 1 acceptance is now fully closed, with the backend-is-Claude interim expli
 
 ## 13. Slices L2–L5 — "Momus, Clio, Prometheus, Hephaestus" *(parallel, after L1)*
 
-**Proves:** pod-class expansion that turns Daedalus from "one agent per task" into "coordinated team." All four pod classes commission through Themis (or directly through Minos for scheduled/triggered flows) and run under Phase 2's trust-boundary + confirmation-token infrastructure.
+**Proves:** pod-class expansion that turns Zakros from "one agent per task" into "coordinated team." All four pod classes commission through Themis (or directly through Minos for scheduled/triggered flows) and run under Phase 2's trust-boundary + confirmation-token infrastructure.
 
 These are parallel because they touch non-overlapping pod images, MCP scopes, and task types. Each is gated on L1 (for coordination) and K (for confirmation tokens).
 
@@ -632,11 +632,11 @@ These are parallel because they touch non-overlapping pod images, MCP scopes, an
 - Pod image under `agents/momus/`, ephemeral per-PR spawn
 - Two-stage review: qwen2.5-coder:32b on Athena for full-sweep triage, Apollo → Anthropic Claude for escalation of high-confidence findings and architectural drift
 - `github.pr.comment` scope only (no `approve`, no `merge`, no push — capability gating is the backstop per `security.md §11`)
-- Triggered by every Daedalus-opened PR (Minos dispatches Momus on PR creation)
+- Triggered by every Zakros-opened PR (Minos dispatches Momus on PR creation)
 - Reads `docs/adr/accepted/**` for architectural-drift detection
 - New task type: `review`; new capability: `task.commission.review` (commissioner role picks this up by default)
 
-**Acceptance:** Momus reviews every Daedalus-opened PR before the human reviewer sees it; review comments post to the PR; local tier's findings and escalated tier's findings are distinguishable in the comment source; `roadmap.md §Phase 2 acceptance` bullet 5 passes.
+**Acceptance:** Momus reviews every Zakros-opened PR before the human reviewer sees it; review comments post to the PR; local tier's findings and escalated tier's findings are distinguishable in the comment source; `roadmap.md §Phase 2 acceptance` bullet 5 passes.
 
 ### Slice L3 — Clio (documentation)
 

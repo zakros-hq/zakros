@@ -19,12 +19,12 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/GoodOlClint/daedalus/agents/iris/internal/iris"
+	"github.com/zakros-hq/zakros/agents/iris/internal/iris"
 )
 
 // envConfig captures the environment variables Iris reads at startup.
 // Naming mirrors the existing Phase 1 worker-pod conventions
-// (`DAEDALUS_*`) where they overlap; Iris-specific knobs prefix `IRIS_`.
+// (`ZAKROS_*`) where they overlap; Iris-specific knobs prefix `IRIS_`.
 type envConfig struct {
 	MinosURL              string
 	IrisToken             string
@@ -40,7 +40,7 @@ type envConfig struct {
 
 func loadEnv() (envConfig, error) {
 	c := envConfig{
-		MinosURL:            os.Getenv("DAEDALUS_MINOS_URL"),
+		MinosURL:            os.Getenv("ZAKROS_MINOS_URL"),
 		IrisToken:           os.Getenv("IRIS_BEARER"),
 		AdminToken:          os.Getenv("IRIS_ADMIN_TOKEN"),
 		AnthropicKey:        os.Getenv("ANTHROPIC_API_KEY"),
@@ -65,7 +65,7 @@ func loadEnv() (envConfig, error) {
 
 	missing := []string{}
 	if c.MinosURL == "" {
-		missing = append(missing, "DAEDALUS_MINOS_URL")
+		missing = append(missing, "ZAKROS_MINOS_URL")
 	}
 	if c.IrisToken == "" {
 		missing = append(missing, "IRIS_BEARER")

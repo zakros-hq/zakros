@@ -7,15 +7,15 @@ import (
 
 	"github.com/google/uuid"
 
-	hermescore "github.com/GoodOlClint/daedalus/hermes/core"
-	"github.com/GoodOlClint/daedalus/hermes/plugins/fakeplugin"
-	"github.com/GoodOlClint/daedalus/minos/argus"
-	"github.com/GoodOlClint/daedalus/minos/dispatch"
-	"github.com/GoodOlClint/daedalus/minos/dispatch/fakedispatch"
-	"github.com/GoodOlClint/daedalus/minos/storage"
-	"github.com/GoodOlClint/daedalus/minos/storage/memstore"
-	"github.com/GoodOlClint/daedalus/pkg/audit"
-	"github.com/GoodOlClint/daedalus/pkg/envelope"
+	hermescore "github.com/zakros-hq/zakros/hermes/core"
+	"github.com/zakros-hq/zakros/hermes/plugins/fakeplugin"
+	"github.com/zakros-hq/zakros/minos/argus"
+	"github.com/zakros-hq/zakros/minos/dispatch"
+	"github.com/zakros-hq/zakros/minos/dispatch/fakedispatch"
+	"github.com/zakros-hq/zakros/minos/storage"
+	"github.com/zakros-hq/zakros/minos/storage/memstore"
+	"github.com/zakros-hq/zakros/pkg/audit"
+	"github.com/zakros-hq/zakros/pkg/envelope"
 )
 
 type discardWriter struct{}
@@ -102,10 +102,10 @@ func insertTrackedTask(t *testing.T, rig *testRig, budget time.Duration) *storag
 		t.Fatalf("transition: %v", err)
 	}
 	// Spawn a fake pod so DeletePod can find it.
-	if err := rig.disp.SpawnPod(ctx, dispatch.PodSpec{Name: podName, Namespace: "daedalus"}); err != nil {
+	if err := rig.disp.SpawnPod(ctx, dispatch.PodSpec{Name: podName, Namespace: "zakros"}); err != nil {
 		t.Fatalf("spawn: %v", err)
 	}
-	rig.a.TrackTask(task, "daedalus")
+	rig.a.TrackTask(task, "zakros")
 	return task
 }
 
@@ -208,7 +208,7 @@ func TestArgusHibernatesOnPodSucceeded(t *testing.T) {
 	task := insertTrackedTask(t, rig, 1000*time.Second)
 
 	// Simulate the worker opening its PR and exiting cleanly.
-	rig.disp.SetPhase("daedalus", *task.PodName, dispatch.PhaseSucceeded)
+	rig.disp.SetPhase("zakros", *task.PodName, dispatch.PhaseSucceeded)
 	rig.a.Evaluate(context.Background())
 
 	stored, _ := rig.store.GetTask(context.Background(), task.ID)
@@ -290,7 +290,7 @@ func TestArgusMarksFailedOnPodFailed(t *testing.T) {
 	rig := newRig(t, cfg)
 	task := insertTrackedTask(t, rig, 1000*time.Second)
 
-	rig.disp.SetPhase("daedalus", *task.PodName, dispatch.PhaseFailed)
+	rig.disp.SetPhase("zakros", *task.PodName, dispatch.PhaseFailed)
 	rig.a.Evaluate(context.Background())
 
 	stored, _ := rig.store.GetTask(context.Background(), task.ID)

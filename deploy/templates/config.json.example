@@ -1,6 +1,6 @@
 {
   "listen_addr": ":8080",
-  "database_url": "postgres://daedalus:REPLACE_POSTGRES_PASSWORD@172.16.140.100:5432/daedalus?sslmode=disable",
+  "database_url": "postgres://zakros:REPLACE_POSTGRES_PASSWORD@172.16.140.100:5432/zakros?sslmode=disable",
 
   "bearer_secret_ref": "minos/bearer",
   "admin_token_ref": "minos/admin-token",
@@ -15,10 +15,10 @@
   },
 
   "project": {
-    "id": "daedalus-phase1",
+    "id": "zakros-phase1",
     "backend": "k3s",
-    "plugin_image": "daedalus/claude-code:local",
-    "argus_sidecar_image": "daedalus/argus-sidecar:local",
+    "plugin_image": "zakros/claude-code:local",
+    "argus_sidecar_image": "zakros/argus-sidecar:local",
     "agent_mention_handle": "",
     "default_workspace_size": "small",
     "default_base_branch": "main",

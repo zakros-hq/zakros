@@ -11,14 +11,14 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/GoodOlClint/daedalus/cerberus/core/replay"
-	"github.com/GoodOlClint/daedalus/minos/core"
-	"github.com/GoodOlClint/daedalus/minos/dispatch/fakedispatch"
-	"github.com/GoodOlClint/daedalus/minos/storage/memstore"
-	mnemocore "github.com/GoodOlClint/daedalus/mnemosyne/core"
-	mnemomem "github.com/GoodOlClint/daedalus/mnemosyne/memstore"
-	"github.com/GoodOlClint/daedalus/pkg/audit"
-	"github.com/GoodOlClint/daedalus/pkg/envelope"
+	"github.com/zakros-hq/zakros/cerberus/core/replay"
+	"github.com/zakros-hq/zakros/minos/core"
+	"github.com/zakros-hq/zakros/minos/dispatch/fakedispatch"
+	"github.com/zakros-hq/zakros/minos/storage/memstore"
+	mnemocore "github.com/zakros-hq/zakros/mnemosyne/core"
+	mnemomem "github.com/zakros-hq/zakros/mnemosyne/memstore"
+	"github.com/zakros-hq/zakros/pkg/audit"
+	"github.com/zakros-hq/zakros/pkg/envelope"
 )
 
 // newTestServerWithMnemosyne builds a rig with a memstore-backed mnemosyne

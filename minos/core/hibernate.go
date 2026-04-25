@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"time"
 
-	hermescore "github.com/GoodOlClint/daedalus/hermes/core"
-	"github.com/GoodOlClint/daedalus/minos/storage"
-	"github.com/GoodOlClint/daedalus/pkg/audit"
+	hermescore "github.com/zakros-hq/zakros/hermes/core"
+	"github.com/zakros-hq/zakros/minos/storage"
+	"github.com/zakros-hq/zakros/pkg/audit"
 )
 
 // SweepHibernation runs one pass of the awaiting-review sweeper: reminds

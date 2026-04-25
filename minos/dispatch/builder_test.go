@@ -7,9 +7,9 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/GoodOlClint/daedalus/minos/dispatch"
-	"github.com/GoodOlClint/daedalus/pkg/envelope"
-	"github.com/GoodOlClint/daedalus/pkg/provider"
+	"github.com/zakros-hq/zakros/minos/dispatch"
+	"github.com/zakros-hq/zakros/pkg/envelope"
+	"github.com/zakros-hq/zakros/pkg/provider"
 )
 
 type stubResolver map[string][]byte
@@ -59,7 +59,7 @@ func TestBuildPodSpec(t *testing.T) {
 		Envelope:      sampleEnvelope(t),
 		TaskID:        taskID,
 		RunID:         runID,
-		Namespace:     "daedalus-test",
+		Namespace:     "zakros-test",
 		Image:         "ghcr.io/example/plugin:latest",
 		ProjectID:     "test-project",
 		WorkspaceSize: envelope.WorkspaceMedium,
@@ -69,7 +69,7 @@ func TestBuildPodSpec(t *testing.T) {
 	if err != nil {
 		t.Fatalf("build: %v", err)
 	}
-	if spec.Namespace != "daedalus-test" {
+	if spec.Namespace != "zakros-test" {
 		t.Errorf("namespace: %s", spec.Namespace)
 	}
 	if spec.Image != in.Image {
@@ -78,16 +78,16 @@ func TestBuildPodSpec(t *testing.T) {
 	if got := spec.SecretEnv["GITHUB_TOKEN"]; got != "ghs_fake" {
 		t.Errorf("credential not resolved: %q", got)
 	}
-	if spec.PlainEnv["DAEDALUS_ENVELOPE"] != dispatch.EnvelopePath {
-		t.Errorf("envelope path not injected: %s", spec.PlainEnv["DAEDALUS_ENVELOPE"])
+	if spec.PlainEnv["ZAKROS_ENVELOPE"] != dispatch.EnvelopePath {
+		t.Errorf("envelope path not injected: %s", spec.PlainEnv["ZAKROS_ENVELOPE"])
 	}
-	if spec.PlainEnv["DAEDALUS_TASK_ID"] != taskID.String() {
+	if spec.PlainEnv["ZAKROS_TASK_ID"] != taskID.String() {
 		t.Errorf("task id not injected")
 	}
 	if spec.EphemeralDisk != "50Gi" {
 		t.Errorf("medium workspace should be 50Gi, got %s", spec.EphemeralDisk)
 	}
-	if spec.Labels["daedalus.project/task-id"] != taskID.String() {
+	if spec.Labels["zakros.project/task-id"] != taskID.String() {
 		t.Errorf("task-id label missing")
 	}
 	// Envelope JSON round-trips.
@@ -105,7 +105,7 @@ func TestBuildPodSpecResolverError(t *testing.T) {
 		Envelope:  sampleEnvelope(t),
 		TaskID:    uuid.New(),
 		RunID:     uuid.New(),
-		Namespace: "daedalus-test",
+		Namespace: "zakros-test",
 		Image:     "img",
 		ProjectID: "p",
 		Resolver:  stubResolver{}, // no credential registered — should error

@@ -3,7 +3,7 @@ package discord_test
 import (
 	"testing"
 
-	"github.com/GoodOlClint/daedalus/hermes/plugins/discord"
+	"github.com/zakros-hq/zakros/hermes/plugins/discord"
 )
 
 func TestNewRequiresToken(t *testing.T) {

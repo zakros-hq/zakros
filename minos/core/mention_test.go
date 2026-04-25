@@ -8,8 +8,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/GoodOlClint/daedalus/minos/core"
-	"github.com/GoodOlClint/daedalus/minos/storage"
+	"github.com/zakros-hq/zakros/minos/core"
+	"github.com/zakros-hq/zakros/minos/storage"
 )
 
 // bindAndHibernate binds a PR URL to a commissioned task and flips the
@@ -33,7 +33,7 @@ func bindAndHibernate(t *testing.T, kit testServerKit, ts *httptest.Server, prUR
 		t.Fatalf("transition: %v", err)
 	}
 	// Free the pod so the respawn test has a clean dispatcher slot.
-	_ = kit.dispatcher.DeletePod(context.Background(), "daedalus", *task.PodName)
+	_ = kit.dispatcher.DeletePod(context.Background(), "zakros", *task.PodName)
 	return task
 }
 

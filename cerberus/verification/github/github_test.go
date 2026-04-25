@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GoodOlClint/daedalus/cerberus/verification/github"
+	"github.com/zakros-hq/zakros/cerberus/verification/github"
 )
 
 type memStore struct {

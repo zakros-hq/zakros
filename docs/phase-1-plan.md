@@ -1,4 +1,4 @@
-# Project Daedalus — Phase 1 Plan
+# Project Zakros — Phase 1 Plan
 
 *Version 0.1 — Draft*
 
@@ -28,7 +28,7 @@ Every slice below closes one or more of these bullets.
 
 ### Language: Go
 
-Daedalus is a systems/orchestration codebase — the architectural neighbors are Kubernetes, Vault, Consul, Nomad, Traefik, containerd. Go is the default language for Phase 1 for these maintainability reasons:
+Zakros is a systems/orchestration codebase — the architectural neighbors are Kubernetes, Vault, Consul, Nomad, Traefik, containerd. Go is the default language for Phase 1 for these maintainability reasons:
 
 - **Static single-binary deploy.** One file per service, `systemctl restart` is the release; no per-service venv management, lockfile-per-service, or Python-version drift.
 - **Compile-time safety over mutating shape.** Task envelope schema, scope tables, JWT claim shapes, and broker registry will all mutate across phases. Go's structural typing catches renames and shape changes at compile time; the single-operator homelab cannot rely on Python's runtime-caught shape errors as a safety net.
@@ -73,11 +73,11 @@ Prereqs ····································
 
 ## 3. Prerequisites — Crete host and VMs
 
-Prerequisites is a parallel track, not a gate on code work. Slice A code develops on the operator workstation against local substrates; Prerequisites must be complete by Slice A's acceptance checkpoint (when the first real deploy to Crete happens), but coding can start immediately. This section is environment work, not Daedalus code: a one-time manual host install followed by automated Terraform provisioning modeled on the sibling `homelab/` repo.
+Prerequisites is a parallel track, not a gate on code work. Slice A code develops on the operator workstation against local substrates; Prerequisites must be complete by Slice A's acceptance checkpoint (when the first real deploy to Crete happens), but coding can start immediately. This section is environment work, not Zakros code: a one-time manual host install followed by automated Terraform provisioning modeled on the sibling `homelab/` repo.
 
 ### 3.1 Manual Proxmox host install (Crete)
 
-Hypervisor setup is one-time and intentionally out of scope for automation — the `homelab/` repo assumes Proxmox already exists, and Daedalus assumes the same. These steps land on Crete before any Terraform runs.
+Hypervisor setup is one-time and intentionally out of scope for automation — the `homelab/` repo assumes Proxmox already exists, and Zakros assumes the same. These steps land on Crete before any Terraform runs.
 
 **Hardware prep:**
 - Minisforum MS-01 racked per `environment.md §1`
@@ -92,7 +92,7 @@ Hypervisor setup is one-time and intentionally out of scope for automation — t
 
 **Networking:**
 - Proxmox bridge `vmbr0` bound to the uplink NIC with VLAN-aware mode enabled
-- All VLAN tags used by Daedalus guests (management, services) configured on `vmbr0` — the guests attach via tagged subinterfaces in Terraform
+- All VLAN tags used by Zakros guests (management, services) configured on `vmbr0` — the guests attach via tagged subinterfaces in Terraform
 - Specific VLAN IDs are a Phase 1 open question per `architecture.md §23`; confirm them before Terraform runs
 - Edge firewall (pfSense or equivalent) has a rule allowing admin access to Crete from the operator workstation VLAN
 
@@ -107,13 +107,13 @@ Hypervisor setup is one-time and intentionally out of scope for automation — t
 - ISO/cloud-image storage pool confirmed (`local` is fine as default)
 - Third M.2 slot remains unallocated per `environment.md §1`
 
-**Explicitly out of scope for Daedalus:**
-- Off-host backup (`environment.md §1`: Proxmox snapshots are the recovery floor; external backup is not in Daedalus scope)
-- VLAN/SDN creation on Crete when it does not already exist — either provisioned by the `homelab/` repo's `modules/network/` or created manually; Daedalus Terraform references VLANs rather than declaring them
+**Explicitly out of scope for Zakros:**
+- Off-host backup (`environment.md §1`: Proxmox snapshots are the recovery floor; external backup is not in Zakros scope)
+- VLAN/SDN creation on Crete when it does not already exist — either provisioned by the `homelab/` repo's `modules/network/` or created manually; Zakros Terraform references VLANs rather than declaring them
 
 ### 3.2 Terraform VM provisioning
 
-Daedalus ships a `terraform/` directory at the repo root patterned on `homelab/terraform/`, scoped to the four Daedalus guests and nothing else. The full homelab stack (UniFi provider, Vultr, Cloudflare, SDN management, Ansible inventory seeding for the whole lab) is explicitly not copied in — Daedalus provisions what Daedalus owns.
+Zakros ships a `terraform/` directory at the repo root patterned on `homelab/terraform/`, scoped to the four Zakros guests and nothing else. The full homelab stack (UniFi provider, Vultr, Cloudflare, SDN management, Ansible inventory seeding for the whole lab) is explicitly not copied in — Zakros provisions what Zakros owns.
 
 **Repo layout:**
 ```
@@ -122,7 +122,7 @@ terraform/
   provider.tf                 — bpg/proxmox provider config
   variables.tf                — inputs (Proxmox endpoint, credentials, VLAN refs)
   outputs.tf                  — VM IPs, SSH user, inventory yaml
-  vm-configs.tf               — Daedalus guest definitions
+  vm-configs.tf               — Zakros guest definitions
   vars.auto.tfvars.example    — sanitized template; real tfvars gitignored
   modules/
     proxmox-vm/               — VM module, adapted from homelab
@@ -147,14 +147,14 @@ terraform/
 VLAN references live as variables so specific VLAN IDs can land without editing `vm-configs.tf`.
 
 **LXC handling:**
-- Homelab's `modules/proxmox-vm/` is VM-only; Daedalus adds a sibling `modules/proxmox-lxc/` using `proxmox_virtual_environment_container` for the Postgres guest
+- Homelab's `modules/proxmox-vm/` is VM-only; Zakros adds a sibling `modules/proxmox-lxc/` using `proxmox_virtual_environment_container` for the Postgres guest
 - LXC cloud-init equivalent (hook scripts or `user_data`) provisions initial user, SSH key, baseline packages — same downstream contract as VM cloud-init
 
 **Cloud-init baseline (all guests):**
 - Non-root admin user with operator's SSH public key injected
 - Timezone, NTP, locale set from Terraform variables
 - `apt update && apt upgrade` on first boot; unattended-upgrades enabled
-- UFW or nftables default-deny inbound except SSH (plus the guest's Daedalus-specific ports once Slice A lands the services)
+- UFW or nftables default-deny inbound except SSH (plus the guest's Zakros-specific ports once Slice A lands the services)
 
 **Inventory output:**
 - `terraform output -raw ansible_inventory_yaml > inventory.yaml` produces an Ansible-shaped inventory mirroring `homelab/` even if Phase 1 does not adopt Ansible for post-provision (4-VM scale is within shell-script reach)
@@ -194,7 +194,7 @@ Slice A starts from this point.
 
 2. **Ariadne log stack install** (Ariadne VM)
    - Install Vector as the ingest shipper and Loki as the log store per `architecture.md §17`
-   - Configure Vector on each Daedalus guest to forward stdout/journald to Ariadne's Loki
+   - Configure Vector on each Zakros guest to forward stdout/journald to Ariadne's Loki
    - Query-side work (Grafana, ariadne MCP) is deferred; Phase 1 debugging uses direct LogQL
 
 3. **k3s install** (Labyrinth VM)
@@ -314,7 +314,7 @@ Landing D in parallel with B ensures every later slice runs under real guardrail
 
 1. **Argus-sidecar container**
    - `agents/sidecar/argus/` — minimal Go binary that emits heartbeat POST to Minos's Argus ingest endpoint on a configurable interval (default: 30s)
-   - Runs in every Daedalus pod alongside the worker backend and thread sidecar
+   - Runs in every Zakros pod alongside the worker backend and thread sidecar
 
 2. **Argus logic in Minos**
    - `minos/argus/` package — per-agent state table in Postgres (`started_at`, `last_heartbeat_at`, `token_count_self_reported`, `mcp_call_count`, `phase`)
@@ -404,7 +404,7 @@ Landing D in parallel with B ensures every later slice runs under real guardrail
    - Specific model chosen, pulled to Athena in advance; model name configured for Iris
 
 2. **Iris pod image**
-   - Long-running pod spec with `daedalus.project/pod-class: iris` label
+   - Long-running pod spec with `zakros.project/pod-class: iris` label
    - Backend: Ollama HTTP client, conversation state persisted to Postgres `iris.conversations` schema (keyed by surface + thread + user identity per `architecture.md §10 Conversation State`)
 
 3. **Minos state API**

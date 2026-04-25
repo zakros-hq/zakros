@@ -1,12 +1,12 @@
 [Unit]
-Description=Daedalus Minos control-plane daemon
+Description=Zakros Minos control-plane daemon
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-User=daedalus
-Group=daedalus
+User=zakros
+Group=zakros
 ExecStart=/usr/local/bin/minos \
   -config /etc/minos/config.json \
   -provider /etc/minos/secrets.json \

@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/GoodOlClint/daedalus/minos/core"
-	"github.com/GoodOlClint/daedalus/pkg/envelope"
+	"github.com/zakros-hq/zakros/minos/core"
+	"github.com/zakros-hq/zakros/pkg/envelope"
 )
 
 // irisAuthedRequest builds a request bearing the Iris token used by

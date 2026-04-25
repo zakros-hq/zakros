@@ -1,4 +1,4 @@
-# Project Daedalus — Security Design
+# Project Zakros — Security Design
 
 *Version 0.1 — Draft*
 
@@ -67,7 +67,7 @@ Every inbound request passes through one ingress plugin and the verification plu
 
 Pods never call the secret provider directly. In Phase 1, Minos resolves credentials and injects them at spawn; in Phase 2, Hecate serves them on authenticated fetch with Minos-set ACLs.
 
-**Phase 1 exception — `claude-code` credential is a shared-blast-radius secret.** The Anthropic API key or OAuth token for `claude-code` is held at deployment scope (one operator subscription) and injected into every Daedalus pod. Per-pod scoping does *not* hold for this credential class in Phase 1 — a compromise of any single pod exposes the operator's full Anthropic subscription. The cost consequences of that compromise are bounded only by the **Anthropic workspace spend cap configured in the Anthropic console** (a Phase 1 deployment prerequisite, not an in-system control; see `security.md §13` and `architecture.md §7 Phase 1 budget posture`). Apollo (Phase 2) closes this gap by moving the credential behind a broker. Accepted Phase 1 risk for the single-operator single-project posture.
+**Phase 1 exception — `claude-code` credential is a shared-blast-radius secret.** The Anthropic API key or OAuth token for `claude-code` is held at deployment scope (one operator subscription) and injected into every Zakros pod. Per-pod scoping does *not* hold for this credential class in Phase 1 — a compromise of any single pod exposes the operator's full Anthropic subscription. The cost consequences of that compromise are bounded only by the **Anthropic workspace spend cap configured in the Anthropic console** (a Phase 1 deployment prerequisite, not an in-system control; see `security.md §13` and `architecture.md §7 Phase 1 budget posture`). Apollo (Phase 2) closes this gap by moving the credential behind a broker. Accepted Phase 1 risk for the single-operator single-project posture.
 
 **Remaining implementation work:**
 
@@ -169,13 +169,13 @@ The pattern is universal — it applies identically to Athena (§7), Hermes (§4
 
 **Status: Addressed architecturally.** `architecture.md §16 Egress Granularity` defines:
 
-- **Phase 1** — Proxmox firewall enforces an IP-range allowlist; GitHub IP ranges fetched from `api.github.com/meta` refreshed daily, package registry CDN CIDRs refreshed weekly, Anthropic API CDN ranges for `claude-code`'s direct provider call from every Daedalus pod. Known limitation: hostname-level differentiation within a shared CIDR (GitHub API vs raw vs gists) is not enforceable at this layer. Accepted Phase 1 risk given the single-operator deployment running trusted plugins (`claude-code`, Iris backed by Athena-local Ollama). **Phase 2 Apollo collapse:** once Apollo holds the Anthropic credential (Phase 2), the pod-side Anthropic allowlist entry collapses to "Apollo broker only" and external LLM egress stops crossing the Labyrinth vNIC (`architecture.md §16 Egress Granularity`).
-- **Phase 3** — **Charon** egress proxy (dedicated Proxmox LXC on Crete) in SNI-passthrough mode. Per-pod-class allowlist by port (Daedalus, Pythia, Talos each listen separately); k3s NetworkPolicy restricts pod→port reachability; every request logged to Ariadne. Proxmox firewall collapses to "Labyrinth → Charon only" for external egress.
+- **Phase 1** — Proxmox firewall enforces an IP-range allowlist; GitHub IP ranges fetched from `api.github.com/meta` refreshed daily, package registry CDN CIDRs refreshed weekly, Anthropic API CDN ranges for `claude-code`'s direct provider call from every Zakros pod. Known limitation: hostname-level differentiation within a shared CIDR (GitHub API vs raw vs gists) is not enforceable at this layer. Accepted Phase 1 risk given the single-operator deployment running trusted plugins (`claude-code`, Iris backed by Athena-local Ollama). **Phase 2 Apollo collapse:** once Apollo holds the Anthropic credential (Phase 2), the pod-side Anthropic allowlist entry collapses to "Apollo broker only" and external LLM egress stops crossing the Labyrinth vNIC (`architecture.md §16 Egress Granularity`).
+- **Phase 3** — **Charon** egress proxy (dedicated Proxmox LXC on Crete) in SNI-passthrough mode. Per-pod-class allowlist by port (Zakros, Pythia, Talos each listen separately); k3s NetworkPolicy restricts pod→port reachability; every request logged to Ariadne. Proxmox firewall collapses to "Labyrinth → Charon only" for external egress.
 - **Per-task egress additions** — Phase 3 task schema grows `capabilities.egress_hosts` for temporary per-task additions.
 
 **Remaining implementation work:**
 
-- Specific Daedalus-class hostname allowlist (the current list in `architecture.md §16` is illustrative; the actual curated list needs Phase 1 review)
+- Specific Zakros-class hostname allowlist (the current list in `architecture.md §16` is illustrative; the actual curated list needs Phase 1 review)
 - Pythia denylist contents (Phase 3) — known-malicious domains, known-exfil-risk endpoints
 - Charon audit-log schema — exact fields that land in Ariadne; whether SNI-only is sufficient or whether Host-header peek (which would require TLS termination) is needed for any specific case
 - Fallback when Charon is down — do pods lose external egress entirely, or does Proxmox IP-range fallback take over? Interacts with `security.md §9` on layered enforcement precedence.
@@ -192,7 +192,7 @@ The pattern is universal — it applies identically to Athena (§7), Hermes (§4
 
 - **CNI: Calico** swap lands in Phase 3 (mature NetworkPolicy enforcement, light footprint for single-node k3s). Phase 1–2 ship flannel per the roadmap; Phase 3 may revisit Cilium if eBPF observability or L7 policies become worth the overhead.
 - **Default-deny pod-to-pod traffic.** All intra-cluster traffic denied unless explicitly allowed. The architecture's broker-mediated coordination pattern (Daedalus → research broker → Pythia, never direct) makes default-deny natural — no legitimate cross-pod flows exist.
-- **Per-pod-class NetworkPolicies** selected via labels (`daedalus.project/pod-class`). Each class's egress allow-list names only its required destinations; no class allows egress to another pod class.
+- **Per-pod-class NetworkPolicies** selected via labels (`zakros.project/pod-class`). Each class's egress allow-list names only its required destinations; no class allows egress to another pod class.
 - **Intra-pod sidecar traffic** (thread sidecar ↔ agent, Argus sidecar ↔ agent) uses the pod's shared network namespace (localhost) and is not NetworkPolicy-visible — contained by construction.
 - **Layered precedence** — Proxmox firewall + Labyrinth host firewall + NetworkPolicy compose as "AND". Traffic passes all applicable layers; strictest wins. Tightening any one layer cannot be undone by a looser configuration in another.
 
@@ -284,7 +284,7 @@ All these surfaces route through the §8 untrusted-read contract — tool-output
 
 ## 13. Phase 1 Cost Ceiling
 
-**Threat:** Phase 1 has no non-forgeable in-system token-budget signal (see §5 and `architecture.md §7 Phase 1 budget posture`). Combined with the shared `claude-code` credential (§3 Phase 1 exception) and the `@mention` respawn trigger (`architecture.md §8`), a runaway condition — an injection-driven loop, a misconfigured respawn, or hostile third-party comments on a repo accepting outside contributors — scales Anthropic spend linearly with nothing in Daedalus stopping it.
+**Threat:** Phase 1 has no non-forgeable in-system token-budget signal (see §5 and `architecture.md §7 Phase 1 budget posture`). Combined with the shared `claude-code` credential (§3 Phase 1 exception) and the `@mention` respawn trigger (`architecture.md §8`), a runaway condition — an injection-driven loop, a misconfigured respawn, or hostile third-party comments on a repo accepting outside contributors — scales Anthropic spend linearly with nothing in Zakros stopping it.
 
 **Phase: 1 (outer boundary), 2 (in-system cap).** Phase 1 relies on an out-of-system ceiling configured at the provider. Phase 2 brings Apollo online with non-forgeable token counts from provider responses, closing the in-system gap.
 

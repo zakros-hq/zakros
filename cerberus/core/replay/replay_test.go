@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GoodOlClint/daedalus/cerberus/core/replay"
+	"github.com/zakros-hq/zakros/cerberus/core/replay"
 )
 
 func TestMemStoreDedup(t *testing.T) {

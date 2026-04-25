@@ -1,4 +1,4 @@
-# Project Daedalus — Roadmap
+# Project Zakros — Roadmap
 
 *Version 0.1 — Draft*
 
@@ -6,7 +6,7 @@
 
 ## Purpose
 
-This document is the authoritative phasing for Project Daedalus. `architecture.md`, `security.md`, and `environment.md` derive their "Phase N" annotations from this file. When a component's phase assignment changes, it changes here first, then the other docs are updated to match.
+This document is the authoritative phasing for Project Zakros. `architecture.md`, `security.md`, and `environment.md` derive their "Phase N" annotations from this file. When a component's phase assignment changes, it changes here first, then the other docs are updated to match.
 
 The goal of the roadmap is to ship a working OpenClaw replacement that solves the pod-per-branch isolation and cross-run memory problems OpenClaw cannot, without dragging the full broker fleet and hardening surface in on day one. Controls that exist to defend against threats this deployment does not yet face are deferred explicitly rather than implemented prematurely.
 
@@ -18,7 +18,7 @@ The goal of the roadmap is to ship a working OpenClaw replacement that solves th
 - **Single operator, single project, single surface.** Phase 1 does not support multiple admins, multiple projects, or multiple communication surfaces. These are Phase 2/3 expansions.
 - **Single private repo with trusted contributors.** Phase 1 targets one private repository whose contributor set is the operator and anyone the operator directly invites. Outside-contributor PRs, public-repo operation, and repos with a broader contributor set are Phase 2+ — the `@mention` respawn trigger, the review-feedback-as-untrusted path, and the Mnemosyne cross-run injection tolerance all rest on this precondition. A repo that accepts PRs from arbitrary GitHub users is not Phase 1 ground.
 - **Local trust inside Crete.** Phase 1 relies on network isolation within Crete rather than cryptographic broker auth. Nothing Phase 1 exposes outside Crete's edge beyond Cloudflare Tunnel ingress.
-- **Postgres LXC is a single point of failure for the control plane.** Phase 1 is fail-silent on Postgres loss — Argus cannot persist state transitions, queued tasks cannot dispatch, and the operator notices via Proxmox-level VM health (not via Daedalus itself). Asclepius (Phase 3) adds a Daedalus-native alert; until then, Postgres uptime is treated as a homelab-operations concern.
+- **Postgres LXC is a single point of failure for the control plane.** Phase 1 is fail-silent on Postgres loss — Argus cannot persist state transitions, queued tasks cannot dispatch, and the operator notices via Proxmox-level VM health (not via Zakros itself). Asclepius (Phase 3) adds a Zakros-native alert; until then, Postgres uptime is treated as a homelab-operations concern.
 - **Hydra is dropped.** Labyrinth is a single-node k3s cluster for the foreseeable roadmap. If multi-node capacity becomes necessary later, it is a new phase, not a backlog item.
 
 ---
@@ -45,7 +45,7 @@ Goal: replace OpenClaw with a system that solves branching isolation and persist
 
 ### Pods in Labyrinth
 
-- **Daedalus agent pods** — worker backend plugin interface; Phase 1 implementation invokes the `claude-code` binary inside the pod. The binary manages its own Anthropic connection and credentials — Minos injects the operator-configured Claude credential (API key or OAuth token) into the pod's environment at spawn; no Anthropic traffic flows through a Daedalus-managed broker. Pod-per-task, one agent per feature branch, isolated workspace per pod.
+- **Daedalus agent pods** — worker backend plugin interface; Phase 1 implementation invokes the `claude-code` binary inside the pod. The binary manages its own Anthropic connection and credentials — Minos injects the operator-configured Claude credential (API key or OAuth token) into the pod's environment at spawn; no Anthropic traffic flows through a Zakros-managed broker. Pod-per-task, one agent per feature branch, isolated workspace per pod.
 - **Iris conversational pod** — long-running pod; single entry point for operator interaction. Translates natural-language requests into Minos commissions and state queries under the admin's identity. Backed by an Ollama-hosted model on Athena (not an external LLM); Iris's inference path is Labyrinth → Athena's Ollama port, same network shape agents already use for local inference.
 - **Thread sidecar** — posts status/progress directly to the configured surface via Hermes.
 
@@ -60,8 +60,8 @@ Goal: replace OpenClaw with a system that solves branching isolation and persist
 
 ### Explicitly deferred from Phase 1
 
-- Apollo external-LLM broker — deferred cleanly because no pod calls an external LLM API through Daedalus-managed plumbing in Phase 1. The `claude-code` binary in agent pods manages its own Anthropic connection; Iris uses Athena local inference. Apollo lands in Phase 2 when a second provider or centralized usage tracking becomes useful.
-- Proxmox MCP broker and `infra` task type — Phase 1 ships code and inference-tuning tasks only. Infra tasks (Proxmox/Terraform changes) land in Phase 2 with the Proxmox broker; Phase 2 research will first check whether an existing community Proxmox MCP fits the Daedalus broker contract before writing one.
+- Apollo external-LLM broker — deferred cleanly because no pod calls an external LLM API through Zakros-managed plumbing in Phase 1. The `claude-code` binary in agent pods manages its own Anthropic connection; Iris uses Athena local inference. Apollo lands in Phase 2 when a second provider or centralized usage tracking becomes useful.
+- Proxmox MCP broker and `infra` task type — Phase 1 ships code and inference-tuning tasks only. Infra tasks (Proxmox/Terraform changes) land in Phase 2 with the Proxmox broker; Phase 2 research will first check whether an existing community Proxmox MCP fits the Zakros broker contract before writing one.
 - Hecate credentials broker — Phase 1 uses Minos-push injection into pods and broker subprocesses instead. Hecate lands in Phase 2 alongside JWT MCP broker auth, enabling in-pod credential refresh and collapsing the Phase 1 "Minos is sole caller" push model into a standard JWT-authenticated pull broker.
 - JWT MCP broker authentication — bearer tokens on local HTTP suffice.
 - Trust boundary contract formalized in the plugin interface — agents still receive user/file content but no explicit trusted/untrusted framing primitive.
@@ -69,7 +69,7 @@ Goal: replace OpenClaw with a system that solves branching isolation and persist
 - Pairing flow, capability-based authz, identity registry, role bundles, revocation semantics.
 - Break-glass session minting — operator uses kubectl directly from the Minos VM.
 - Trust-boundary Mnemosyne source tagging — sanitization runs; untrusted-source tagging is Phase 2.
-- Calico CNI and NetworkPolicy layering — default flannel is accepted for Phase 1 since there is one pod class that matters (Daedalus) and Iris, both running trusted plugins.
+- Calico CNI and NetworkPolicy layering — default flannel is accepted for Phase 1 since there is one pod class that matters (Zakros) and Iris, both running trusted plugins.
 - Charon egress proxy — Proxmox firewall IP-allowlist handles egress.
 - Asclepius — Proxmox native + systemd watch handles VM/service health.
 - Pythia, Talos, Minotaur, Typhon — no research, QA, red-team, or chaos pods.
@@ -88,7 +88,7 @@ Goal: replace OpenClaw with a system that solves branching isolation and persist
 
 ## Phase 2 — Broker layer, pod-class expansion, and hardening
 
-Goal: extract the broker fleet, add the pod classes that turn Daedalus from "one agent per task" into a coordinated team, and add the security controls Phase 1 deferred. This phase is triggered when any of the following becomes true:
+Goal: extract the broker fleet, add the pod classes that turn Zakros from "one agent per task" into a coordinated team, and add the security controls Phase 1 deferred. This phase is triggered when any of the following becomes true:
 - A second surface (Slack, Teams, Telegram, Matrix) needs to coexist with the Phase 1 surface
 - A second operator needs non-admin access (commissioners, observers)
 - A second LLM provider (OpenAI, Google) is needed alongside Anthropic
@@ -99,7 +99,7 @@ Goal: extract the broker fleet, add the pod classes that turn Daedalus from "one
 ### Broker extraction
 
 - **Apollo** — external LLM broker with per-provider plugins, non-forgeable usage tracking, per-project rate limits, audit to Ariadne, subprocess isolation per provider
-- **Proxmox MCP broker** — lands alongside the `infra` task type. Design first checks whether an existing community Proxmox MCP meets the Daedalus broker contract (JWT auth, scope enforcement, Ariadne audit); only written in-house if no fit. Enables the `task.commission.infra` capability and Minos's per-project Proxmox token injection (`architecture.md §6` Other credentials).
+- **Proxmox MCP broker** — lands alongside the `infra` task type. Design first checks whether an existing community Proxmox MCP meets the Zakros broker contract (JWT auth, scope enforcement, Ariadne audit); only written in-house if no fit. Enables the `task.commission.infra` capability and Minos's per-project Proxmox token injection (`architecture.md §6` Other credentials).
 - **Hecate** — credentials broker, fronts the secret provider, enforces Minos-set per-credential ACLs on JWT-authenticated fetches from pods and Minos-VM broker subprocesses. Required for in-pod credential refresh (tasks that outlive the GitHub App installation token's 1-hour TTL) and for cleanly serving credentials to the newly-extracted plugin subprocesses of Hermes/Cerberus/Apollo. Depends on JWT MCP broker auth (below) — shipping Hecate under Phase 1's bearer-token check would make the system's highest-value target the weakest-authenticated.
 - **Hermes** grows subprocess isolation, additional surface plugins, credential rotation via SIGHUP, and inbound-message replay on Minos recovery (timestamped stream delivered to affected pods so agents can decide whether to re-plan or `request_human_input`)
 - **Cerberus** becomes a standalone broker with pluggable ingress + verification plugin layers
@@ -108,7 +108,7 @@ Goal: extract the broker fleet, add the pod classes that turn Daedalus from "one
 ### Pod-class expansion
 
 - **Themis** — project management pod. Owns the backlog, decomposes epics into `task_type` envelopes per `architecture.md §8`, commissions work through Minos, and serves as the default routing point for Argus escalations. Does not replace Minos's control-plane role. Long-lived pod, same lifecycle shape as Iris.
-- **Momus** — code review pod. Runs on every Daedalus-opened PR as automated triage before human review. Two-stage: local tier (`qwen2.5-coder:32b` on Athena) full sweep on every PR, Apollo escalation for high-confidence findings and architectural drift. Expected 60–70% reduction in Claude calls per PR versus routing every review through Apollo. Comment-only GitHub scope; no approve / request-changes / merge.
+- **Momus** — code review pod. Runs on every Zakros-opened PR as automated triage before human review. Two-stage: local tier (`qwen2.5-coder:32b` on Athena) full sweep on every PR, Apollo escalation for high-confidence findings and architectural drift. Expected 60–70% reduction in Claude calls per PR versus routing every review through Apollo. Comment-only GitHub scope; no approve / request-changes / merge.
 - **Clio** — documentation pod. Generates READMEs, API docs, changelogs, and ADR formatting. `docs/**`-scoped GitHub App token; cannot mutate application code. Reactive mode (per merged PR) and scheduled rollup (drift reconciliation).
 - **Prometheus** — DevOps / release pod. Owns pipeline config, version bumping, artifact publication, and environment promotion. Production promotion is a high-blast scope requiring an operator confirmation token.
 - **Hephaestus** — architectural assistant. Drafts ADRs and surfaces coupling / topology concerns; produces draft artifacts only (`docs/adr/proposed/**`, `docs/reports/**`). Promotion to `docs/adr/accepted/**` is human-only. Claude-tier by default (Sonnet; Opus on operator request for genuinely ambiguous structural decisions).
@@ -129,7 +129,7 @@ Goal: extract the broker fleet, add the pod classes that turn Daedalus from "one
 - A second LLM provider plugin works alongside Anthropic, with Apollo-reported usage
 - A high-blast scope invocation from a pod blocks until the operator approves in-thread
 - An injected prompt in a PR comment does not escalate to a high-blast MCP call
-- Momus reviews every Daedalus-opened PR before it reaches the human reviewer, with review comments posted to the PR
+- Momus reviews every Zakros-opened PR before it reaches the human reviewer, with review comments posted to the PR
 - Themis decomposes a multi-task operator request from Iris into an ordered plan, commissions each task through Minos, and reports progress back through Iris
 - An Argus escalation reaches Themis, is classified (halt / re-plan / escalate-to-human), and the corresponding Minos action fires without operator intervention for the re-plan case
 - Clio opens a `docs/**` PR after a feature PR merges; Hephaestus opens a draft ADR in `docs/adr/proposed/**` without ever writing to `docs/adr/accepted/**`; Prometheus cuts a release and is blocked on production promotion pending the operator's confirmation token
@@ -138,11 +138,11 @@ Goal: extract the broker fleet, add the pod classes that turn Daedalus from "one
 
 ## Phase 3 — Expansion
 
-Goal: add the surfaces, pod classes, and operational tooling that broaden what Daedalus can safely do.
+Goal: add the surfaces, pod classes, and operational tooling that broaden what Zakros can safely do.
 
 - **Pythia** research pods with the research MCP broker; prompt-injection surface annotation; per-task domain allowlists
 - **Talos** QA/test pods with test-environment provisioning
-- **Minotaur** red team pod — adversarial reasoning against Daedalus itself. Finds non-obvious attack paths, chains vulnerabilities, probes prompt injection against internal agents and MCP brokers. Claude-tier (Sonnet default, Opus for adversarial depth) — a local model running patterns is a second security scanner, not red teaming.
+- **Minotaur** red team pod — adversarial reasoning against Zakros itself. Finds non-obvious attack paths, chains vulnerabilities, probes prompt injection against internal agents and MCP brokers. Claude-tier (Sonnet default, Opus for adversarial depth) — a local model running patterns is a second security scanner, not red teaming.
 - **Typhon** sandboxed destructive test runner — chaos-engineering counterpart to Minotaur. Intentionally breaks infrastructure and code paths inside isolated workspaces to validate recovery automation. Minotaur breaks agents; Typhon breaks infra.
 - **Athena Development Sandboxes** — Athena MCP sandbox surface (`sandbox.create`/`destroy`/`exec`), launchd-managed per-sandbox users, allocated port ranges. Lands in Phase 3 rather than Phase 2 because per-pod source scoping for sandbox reachability depends on the Calico/NetworkPolicy layer, which is itself Phase 3.
 - **Charon** egress proxy with SNI-passthrough, per-pod-class allowlists, per-task egress additions

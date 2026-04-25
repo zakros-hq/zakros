@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/GoodOlClint/daedalus/pkg/envelope"
+	"github.com/zakros-hq/zakros/pkg/envelope"
 )
 
 // Config is the Minos daemon configuration. Phase 1 is single-project
@@ -27,7 +27,7 @@ type Config struct {
 	IrisTokenRef           string        `json:"iris_token_ref"`
 	GithubWebhookSecretRef string        `json:"github_webhook_secret_ref"`
 	// MinosPodURL is the Minos API URL as seen from inside a Labyrinth
-	// pod. Injected into the pod as DAEDALUS_MINOS_URL so the entrypoint
+	// pod. Injected into the pod as ZAKROS_MINOS_URL so the entrypoint
 	// can POST /tasks/{id}/pr after opening the PR.
 	MinosPodURL string        `json:"minos_pod_url"`
 	Admin       AdminIdentity `json:"admin"`

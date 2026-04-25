@@ -8,15 +8,15 @@
 #
 # Optional env:
 #   IMAGE_TAG=local              # tag applied to both images
-#   REGISTRY_PREFIX=daedalus     # image name prefix — keep unless you push elsewhere
-#   SSH_USER=daedalus            # ssh user on labyrinth
+#   REGISTRY_PREFIX=zakros     # image name prefix — keep unless you push elsewhere
+#   SSH_USER=zakros            # ssh user on labyrinth
 
 set -euo pipefail
 
 : "${LABYRINTH_HOST:?must be set (e.g. 172.16.140.102)}"
 : "${IMAGE_TAG:=local}"
-: "${REGISTRY_PREFIX:=daedalus}"
-: "${SSH_USER:=daedalus}"
+: "${REGISTRY_PREFIX:=zakros}"
+: "${SSH_USER:=zakros}"
 
 WORKER_IMAGE="${REGISTRY_PREFIX}/claude-code:${IMAGE_TAG}"
 SIDECAR_IMAGE="${REGISTRY_PREFIX}/argus-sidecar:${IMAGE_TAG}"
@@ -57,7 +57,7 @@ sudo k3s ctr -n k8s.io images import /tmp/claude-code.tar
 sudo k3s ctr -n k8s.io images import /tmp/argus-sidecar.tar
 sudo k3s ctr -n k8s.io images import /tmp/iris.tar
 rm -f /tmp/claude-code.tar /tmp/argus-sidecar.tar /tmp/iris.tar
-sudo k3s ctr -n k8s.io images ls | grep daedalus/ || true
+sudo k3s ctr -n k8s.io images ls | grep zakros/ || true
 SSH_EOF
 
 echo "==> Done. Use these image names in minos / iris config:"

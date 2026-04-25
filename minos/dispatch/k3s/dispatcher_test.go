@@ -9,20 +9,20 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 
-	"github.com/GoodOlClint/daedalus/minos/dispatch"
-	"github.com/GoodOlClint/daedalus/minos/dispatch/k3s"
+	"github.com/zakros-hq/zakros/minos/dispatch"
+	"github.com/zakros-hq/zakros/minos/dispatch/k3s"
 )
 
 func makeSpec() dispatch.PodSpec {
 	return dispatch.PodSpec{
 		Name:      "daedalus-abcd-efgh",
-		Namespace: "daedalus-test",
+		Namespace: "zakros-test",
 		Labels: map[string]string{
-			"daedalus.project/pod-class": "daedalus",
+			"zakros.project/pod-class": "daedalus",
 		},
 		Image:         "ghcr.io/example/plugin:latest",
 		Envelope:      []byte(`{"schema_version":"1"}`),
-		PlainEnv:      map[string]string{"DAEDALUS_TASK_ID": "t-1"},
+		PlainEnv:      map[string]string{"ZAKROS_TASK_ID": "t-1"},
 		SecretEnv:     map[string]string{"GITHUB_TOKEN": "ghs_fake"},
 		CPURequest:    "500m",
 		CPULimit:      "2",
@@ -63,7 +63,7 @@ func TestSpawnCreatesSecretAndPod(t *testing.T) {
 	// Plain env present.
 	found := false
 	for _, e := range pod.Spec.Containers[0].Env {
-		if e.Name == "DAEDALUS_TASK_ID" && e.Value == "t-1" {
+		if e.Name == "ZAKROS_TASK_ID" && e.Value == "t-1" {
 			found = true
 		}
 	}

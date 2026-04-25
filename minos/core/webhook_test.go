@@ -11,9 +11,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/GoodOlClint/daedalus/minos/core"
-	"github.com/GoodOlClint/daedalus/minos/storage"
-	"github.com/GoodOlClint/daedalus/pkg/envelope"
+	"github.com/zakros-hq/zakros/minos/core"
+	"github.com/zakros-hq/zakros/minos/storage"
+	"github.com/zakros-hq/zakros/pkg/envelope"
 )
 
 // commissionAndGrabToken drives a task through Commission so the test

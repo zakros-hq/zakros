@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GoodOlClint/daedalus/pkg/jwt"
+	"github.com/zakros-hq/zakros/pkg/jwt"
 )
 
 func sampleClaims() jwt.Claims {

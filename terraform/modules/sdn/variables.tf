@@ -21,5 +21,5 @@ variable "vlan_id" {
 
 variable "subnet" {
   type        = string
-  description = "CIDR of the Daedalus VNet; gateway is the first host (OPNsense LAN)"
+  description = "CIDR of the Zakros VNet; gateway is the first host (OPNsense LAN)"
 }

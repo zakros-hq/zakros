@@ -1,5 +1,5 @@
 -- +goose Up
--- The four Daedalus schemas per architecture.md §6 Recovery and Reconciliation.
+-- The four Zakros schemas per architecture.md §6 Recovery and Reconciliation.
 -- pgvector is created here so Mnemosyne's Slice C migrations can assume it
 -- exists; no pgvector columns are created yet.
 CREATE SCHEMA IF NOT EXISTS minos;

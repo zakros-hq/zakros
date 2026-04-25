@@ -6,8 +6,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/GoodOlClint/daedalus/hermes/core"
-	"github.com/GoodOlClint/daedalus/hermes/plugins/fakeplugin"
+	"github.com/zakros-hq/zakros/hermes/core"
+	"github.com/zakros-hq/zakros/hermes/plugins/fakeplugin"
 )
 
 func TestBrokerCreateAndPost(t *testing.T) {

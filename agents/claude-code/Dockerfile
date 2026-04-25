@@ -35,8 +35,8 @@ WORKDIR /home/daedalus
 COPY --chown=daedalus:daedalus entrypoint.sh /usr/local/bin/daedalus-entrypoint
 RUN chmod +x /usr/local/bin/daedalus-entrypoint
 
-ENV DAEDALUS_ENVELOPE=/var/run/daedalus/envelope.json \
-    DAEDALUS_MEMORY_DIR=/var/run/daedalus/memory \
+ENV ZAKROS_ENVELOPE=/var/run/zakros/envelope.json \
+    ZAKROS_MEMORY_DIR=/var/run/zakros/memory \
     WORKSPACE=/workspace
 
 ENTRYPOINT ["/usr/local/bin/daedalus-entrypoint"]

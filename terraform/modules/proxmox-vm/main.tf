@@ -80,12 +80,12 @@ resource "proxmox_virtual_environment_file" "meta_data" {
   node_name    = var.proxmox_node
 
   source_raw {
-    data      = "instance-id: daedalus-${each.key}-${each.value.vm_id}\nlocal-hostname: ${each.key}\n"
+    data      = "instance-id: zakros-${each.key}-${each.value.vm_id}\nlocal-hostname: ${each.key}\n"
     file_name = "${each.key}-meta-data.yaml"
   }
 }
 
-resource "proxmox_virtual_environment_vm" "daedalus" {
+resource "proxmox_virtual_environment_vm" "zakros" {
   for_each = var.vm_configurations
 
   name        = each.key
@@ -93,7 +93,7 @@ resource "proxmox_virtual_environment_vm" "daedalus" {
   node_name   = var.proxmox_node
   description = each.value.description
   machine     = "q35"
-  tags        = ["daedalus", each.key]
+  tags        = ["zakros", each.key]
 
   agent {
     enabled = true

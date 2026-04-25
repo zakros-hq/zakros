@@ -6,16 +6,16 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/GoodOlClint/daedalus/cerberus/core/replay"
-	"github.com/GoodOlClint/daedalus/minos/core"
-	"github.com/GoodOlClint/daedalus/minos/dispatch"
-	"github.com/GoodOlClint/daedalus/minos/dispatch/fakedispatch"
-	"github.com/GoodOlClint/daedalus/minos/storage"
-	"github.com/GoodOlClint/daedalus/minos/storage/memstore"
-	"github.com/GoodOlClint/daedalus/pkg/audit"
-	"github.com/GoodOlClint/daedalus/pkg/envelope"
-	"github.com/GoodOlClint/daedalus/pkg/jwt"
-	"github.com/GoodOlClint/daedalus/pkg/provider"
+	"github.com/zakros-hq/zakros/cerberus/core/replay"
+	"github.com/zakros-hq/zakros/minos/core"
+	"github.com/zakros-hq/zakros/minos/dispatch"
+	"github.com/zakros-hq/zakros/minos/dispatch/fakedispatch"
+	"github.com/zakros-hq/zakros/minos/storage"
+	"github.com/zakros-hq/zakros/minos/storage/memstore"
+	"github.com/zakros-hq/zakros/pkg/audit"
+	"github.com/zakros-hq/zakros/pkg/envelope"
+	"github.com/zakros-hq/zakros/pkg/jwt"
+	"github.com/zakros-hq/zakros/pkg/provider"
 )
 
 // staticProvider is a test double that resolves a single credential by ref.
@@ -72,7 +72,7 @@ func newTestServer(t *testing.T) testServerKit {
 		Project: core.ProjectConfig{
 			ID:                   "test-project",
 			Backend:              "claude-code",
-			PluginImage:          "ghcr.io/example/daedalus-claude-code:latest",
+			PluginImage:          "ghcr.io/example/zakros-claude-code:latest",
 			DefaultWorkspaceSize: envelope.WorkspaceSmall,
 			DefaultBaseBranch:    "main",
 			DefaultBudget: envelope.Budget{
@@ -265,7 +265,7 @@ func TestCommissionSpawnsPodAndTransitionsRunning(t *testing.T) {
 	if pod.Spec.SecretEnv["GITHUB_TOKEN"] != "ghs_injected" {
 		t.Errorf("injected credential not resolved into spec: %q", pod.Spec.SecretEnv["GITHUB_TOKEN"])
 	}
-	if pod.Spec.Labels["daedalus.project/task-id"] != task.ID.String() {
+	if pod.Spec.Labels["zakros.project/task-id"] != task.ID.String() {
 		t.Errorf("task-id label missing from spec")
 	}
 

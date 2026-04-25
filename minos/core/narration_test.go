@@ -8,9 +8,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	hermescore "github.com/GoodOlClint/daedalus/hermes/core"
-	"github.com/GoodOlClint/daedalus/minos/core"
-	"github.com/GoodOlClint/daedalus/pkg/envelope"
+	hermescore "github.com/zakros-hq/zakros/hermes/core"
+	"github.com/zakros-hq/zakros/minos/core"
+	"github.com/zakros-hq/zakros/pkg/envelope"
 )
 
 // postNarration POSTs to /tasks/{id}/post with pod auth. Returns the

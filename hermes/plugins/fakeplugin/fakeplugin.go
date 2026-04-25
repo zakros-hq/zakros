@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/GoodOlClint/daedalus/hermes/core"
+	"github.com/zakros-hq/zakros/hermes/core"
 )
 
 // Thread records a created thread and the posts made to it.

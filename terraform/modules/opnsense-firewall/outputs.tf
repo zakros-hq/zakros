@@ -4,6 +4,6 @@ output "vm_id" {
 }
 
 output "lan_ip" {
-  description = "OPNsense LAN address (gateway for Daedalus guests)"
+  description = "OPNsense LAN address (gateway for Zakros guests)"
   value       = local.lan_host
 }

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://daedalus.local/schemas/envelope.v1.json",
-  "title": "Daedalus Task Envelope",
+  "$id": "https://zakros.local/schemas/envelope.v1.json",
+  "title": "Zakros Task Envelope",
   "description": "Task envelope Minos dispatches to worker backend pods. Authoritative per architecture.md §8 Task Definition.",
   "type": "object",
   "required": [

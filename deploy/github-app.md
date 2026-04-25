@@ -7,7 +7,7 @@ the GitHub API *as* the App is Phase 2 work — Phase 1 webhook-only.)
 ## Prerequisites
 
 - Public hostname pointing at minos via Cloudflare Tunnel
-  (see `deploy/cloudflared-install.sh`). Example: `daedalus.example.com`.
+  (see `deploy/cloudflared-install.sh`). Example: `zakros.example.com`.
 - A strong random webhook secret. Generate once and stash:
   ```sh
   openssl rand -base64 32 | tr -d '=+/' | head -c 40
@@ -19,7 +19,7 @@ GitHub → Settings → Developer settings → **GitHub Apps** → **New GitHub 
 
 | Field | Value |
 | --- | --- |
-| GitHub App name | `daedalus-phase1` (or any unique name) |
+| GitHub App name | `zakros-phase1` (or any unique name) |
 | Homepage URL | `https://<your-public-hostname>/` (anything works; not load-bearing) |
 | Callback URL | leave blank |
 | Setup URL | leave blank |
@@ -64,7 +64,7 @@ Push a test commit to a watched repo, or click **Redeliver** on any
 past delivery in the GitHub App → Advanced → Recent Deliveries page.
 
 ```sh
-ssh daedalus@172.16.140.101 'sudo journalctl -u minos --since "1 minute ago" --no-pager | grep -iE "webhook|cerberus"'
+ssh zakros@172.16.140.101 'sudo journalctl -u minos --since "1 minute ago" --no-pager | grep -iE "webhook|cerberus"'
 ```
 
 Should see a cerberus-category audit line confirming the delivery was
@@ -72,9 +72,9 @@ verified and handled.
 
 ## What's not done yet (Phase 2)
 
-- **App JWT signing + installation tokens** — needed to let Daedalus
+- **App JWT signing + installation tokens** — needed to let Zakros
   *call* GitHub (e.g. comment on PRs as the App rather than as a
   personal token). Phase 1 workers use operator-supplied `gh` CLI auth
   via the injected credentials mechanism instead.
-- **Check runs** — webhook-to-check flow that lets Daedalus mark PRs
+- **Check runs** — webhook-to-check flow that lets Zakros mark PRs
   with pass/fail status. Out of Phase 1 scope per roadmap.md.

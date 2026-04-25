@@ -14,7 +14,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
-	"github.com/GoodOlClint/daedalus/minos/dispatch"
+	"github.com/zakros-hq/zakros/minos/dispatch"
 )
 
 // Dispatcher implements dispatch.Dispatcher against a Kubernetes API.
@@ -165,9 +165,9 @@ func buildPod(spec dispatch.PodSpec) *corev1.Pod {
 			Env:       envVars,
 			Resources: resources,
 			VolumeMounts: []corev1.VolumeMount{
-				{Name: "envelope", MountPath: "/var/run/daedalus", ReadOnly: true},
+				{Name: "envelope", MountPath: "/var/run/zakros", ReadOnly: true},
 				{Name: "workspace", MountPath: "/workspace"},
-				{Name: "memory", MountPath: "/var/run/daedalus/memory"},
+				{Name: "memory", MountPath: "/var/run/zakros/memory"},
 			},
 		},
 	}

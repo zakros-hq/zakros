@@ -11,7 +11,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/GoodOlClint/daedalus/minos/storage"
+	"github.com/zakros-hq/zakros/minos/storage"
 )
 
 // Store is an in-memory implementation of storage.Store.

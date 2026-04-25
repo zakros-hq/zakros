@@ -11,7 +11,7 @@ output "guests" {
       # agent, so it returns empty on first apply before the agent
       # reports and fills in on subsequent refreshes.
       ip = try([
-        for addr in flatten(proxmox_virtual_environment_vm.daedalus[name].ipv4_addresses) :
+        for addr in flatten(proxmox_virtual_environment_vm.zakros[name].ipv4_addresses) :
         addr if addr != "" && addr != "127.0.0.1" && !startswith(addr, "fe80")
       ][0], "")
     }

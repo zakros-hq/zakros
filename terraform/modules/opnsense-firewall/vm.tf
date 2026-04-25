@@ -137,9 +137,9 @@ resource "proxmox_virtual_environment_vm" "opnsense" {
   name        = var.vm_name
   vm_id       = var.vm_id
   node_name   = var.proxmox_node
-  description = "Daedalus egress firewall (OPNsense ${var.opnsense_release} via opnsense-bootstrap). LAN ${local.lan_host}/${local.lan_prefix}"
+  description = "Zakros egress firewall (OPNsense ${var.opnsense_release} via opnsense-bootstrap). LAN ${local.lan_host}/${local.lan_prefix}"
   machine     = "q35"
-  tags        = ["daedalus", "firewall", "opnsense"]
+  tags        = ["zakros", "firewall", "opnsense"]
 
   agent {
     enabled = false # No qemu-guest-agent on OPNsense.
@@ -175,7 +175,7 @@ resource "proxmox_virtual_environment_vm" "opnsense" {
     mac_address = local.wan_mac
   }
 
-  # LAN — Daedalus SDN VNet.
+  # LAN — Zakros SDN VNet.
   network_device {
     bridge      = var.lan_bridge
     mac_address = local.lan_mac

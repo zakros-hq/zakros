@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GoodOlClint/daedalus/minos/core"
-	"github.com/GoodOlClint/daedalus/pkg/envelope"
+	"github.com/zakros-hq/zakros/minos/core"
+	"github.com/zakros-hq/zakros/pkg/envelope"
 )
 
 // startTestHTTPServer brings up the Minos HTTP API on an httptest server.

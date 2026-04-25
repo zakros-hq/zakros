@@ -12,12 +12,12 @@ import (
 
 	"github.com/google/uuid"
 
-	ghverify "github.com/GoodOlClint/daedalus/cerberus/verification/github"
-	hermescore "github.com/GoodOlClint/daedalus/hermes/core"
-	mnemocore "github.com/GoodOlClint/daedalus/mnemosyne/core"
-	"github.com/GoodOlClint/daedalus/minos/storage"
-	"github.com/GoodOlClint/daedalus/pkg/audit"
-	"github.com/GoodOlClint/daedalus/pkg/jwt"
+	ghverify "github.com/zakros-hq/zakros/cerberus/verification/github"
+	hermescore "github.com/zakros-hq/zakros/hermes/core"
+	mnemocore "github.com/zakros-hq/zakros/mnemosyne/core"
+	"github.com/zakros-hq/zakros/minos/storage"
+	"github.com/zakros-hq/zakros/pkg/audit"
+	"github.com/zakros-hq/zakros/pkg/jwt"
 )
 
 // routes builds the HTTP handler for Minos's API.

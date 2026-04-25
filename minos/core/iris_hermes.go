@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	hermescore "github.com/GoodOlClint/daedalus/hermes/core"
-	"github.com/GoodOlClint/daedalus/pkg/audit"
+	hermescore "github.com/zakros-hq/zakros/hermes/core"
+	"github.com/zakros-hq/zakros/pkg/audit"
 )
 
 // IrisPullConsumer is the canonical name for Iris's pull buffer in the

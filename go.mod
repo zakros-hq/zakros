@@ -1,4 +1,4 @@
-module github.com/GoodOlClint/daedalus
+module github.com/zakros-hq/zakros
 
 go 1.25.0
 

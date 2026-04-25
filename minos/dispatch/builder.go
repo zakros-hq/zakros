@@ -7,13 +7,13 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/GoodOlClint/daedalus/pkg/envelope"
-	"github.com/GoodOlClint/daedalus/pkg/provider"
+	"github.com/zakros-hq/zakros/pkg/envelope"
+	"github.com/zakros-hq/zakros/pkg/provider"
 )
 
 // EnvelopePath is where the dispatcher mounts envelope.json inside the pod.
-// The plugin entry script reads DAEDALUS_ENVELOPE to find this path.
-const EnvelopePath = "/var/run/daedalus/envelope.json"
+// The plugin entry script reads ZAKROS_ENVELOPE to find this path.
+const EnvelopePath = "/var/run/zakros/envelope.json"
 
 // BuilderInput carries everything the spec builder needs beyond the
 // envelope itself.
@@ -57,7 +57,7 @@ func BuildPodSpec(ctx context.Context, in BuilderInput) (PodSpec, error) {
 		return PodSpec{}, fmt.Errorf("dispatch: image required")
 	}
 	if in.Namespace == "" {
-		in.Namespace = "daedalus"
+		in.Namespace = "zakros"
 	}
 
 	envJSON, err := json.Marshal(in.Envelope)
@@ -75,26 +75,26 @@ func BuildPodSpec(ctx context.Context, in BuilderInput) (PodSpec, error) {
 	}
 
 	plainEnv := map[string]string{
-		"DAEDALUS_ENVELOPE":       EnvelopePath,
-		"DAEDALUS_TASK_ID":        in.TaskID.String(),
-		"DAEDALUS_RUN_ID":         in.RunID.String(),
-		"DAEDALUS_PROJECT_ID":     in.ProjectID,
-		"DAEDALUS_THREAD_URL":     in.Envelope.Communication.HermesURL,
-		"DAEDALUS_ARGUS_INGEST":   in.Envelope.Communication.ArgusIngestURL,
-		"DAEDALUS_ARIADNE_INGEST": in.Envelope.Communication.AriadneIngestURL,
+		"ZAKROS_ENVELOPE":       EnvelopePath,
+		"ZAKROS_TASK_ID":        in.TaskID.String(),
+		"ZAKROS_RUN_ID":         in.RunID.String(),
+		"ZAKROS_PROJECT_ID":     in.ProjectID,
+		"ZAKROS_THREAD_URL":     in.Envelope.Communication.HermesURL,
+		"ZAKROS_ARGUS_INGEST":   in.Envelope.Communication.ArgusIngestURL,
+		"ZAKROS_ARIADNE_INGEST": in.Envelope.Communication.AriadneIngestURL,
 	}
 	if in.MinosURL != "" {
-		plainEnv["DAEDALUS_MINOS_URL"] = in.MinosURL
+		plainEnv["ZAKROS_MINOS_URL"] = in.MinosURL
 	}
 	if in.Envelope.Capabilities.McpAuthToken != "" {
 		secretEnv["MCP_AUTH_TOKEN"] = in.Envelope.Capabilities.McpAuthToken
 	}
 
 	labels := map[string]string{
-		"daedalus.project/pod-class":  "daedalus",
-		"daedalus.project/project-id": in.ProjectID,
-		"daedalus.project/task-id":    in.TaskID.String(),
-		"daedalus.project/run-id":     in.RunID.String(),
+		"zakros.project/pod-class":  "daedalus",
+		"zakros.project/project-id": in.ProjectID,
+		"zakros.project/task-id":    in.TaskID.String(),
+		"zakros.project/run-id":     in.RunID.String(),
 	}
 
 	size := in.WorkspaceSize

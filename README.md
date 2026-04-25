@@ -1,4 +1,4 @@
-# Project Daedalus
+# Project Zakros
 
 An AI agent orchestrator. Commission a coding task from a chat surface, and a sandboxed agent clones the repo, does the work, and opens a pull request. The control plane never writes code — it dispatches agents that do, and gets out of their way.
 
@@ -42,7 +42,7 @@ Each task is:
 
 ## The pieces
 
-Named for the Minotaur myth — Minos commissioned Daedalus to build the labyrinth.
+Named for the Minoan palace site at Kato Zakro. Component names are drawn from the Minotaur myth — Minos commissioned Daedalus to build the labyrinth.
 
 | Daemon        | Role                                                       |
 | ------------- | ---------------------------------------------------------- |
@@ -61,11 +61,11 @@ Worker pods ship a [`claude-code`](agents/claude-code) image. The AI inference i
 
 ## Hardware
 
-Daedalus runs on two physical hosts in this homelab. The architecture is not bound to these specific devices — see [`docs/environment.md`](docs/environment.md) for the contract each host must satisfy.
+Zakros runs on two physical hosts in this homelab. The architecture is not bound to these specific devices — see [`docs/environment.md`](docs/environment.md) for the contract each host must satisfy.
 
 | Host       | Role                                  | Specs |
 | ---------- | ------------------------------------- | ----- |
-| **Crete**  | Hypervisor for Daedalus VMs + LXC     | Minisforum MS-01 · Intel i9-13900H · 96 GB DDR5 · 2× 1 TB NVMe (ZFS mirror) + third M.2 reserved · 2× 2.5 GbE + 2× 10 GbE · Proxmox VE 9.x |
+| **Crete**  | Hypervisor for Zakros VMs + LXC     | Minisforum MS-01 · Intel i9-13900H · 96 GB DDR5 · 2× 1 TB NVMe (ZFS mirror) + third M.2 reserved · 2× 2.5 GbE + 2× 10 GbE · Proxmox VE 9.x |
 | **Athena** | Local inference oracle (Phase 3 role) | Mac Studio M4 Max (Z1CD9LL/A) · 40-core GPU · 48 GB unified memory · 1 TB internal · macOS / launchd |
 
 ### Why a dedicated Crete host
@@ -73,7 +73,7 @@ Daedalus runs on two physical hosts in this homelab. The architecture is not bou
 Worker pods execute LLM-driven code with network access and write privileges on a feature branch. The blast radius of a misbehaving or compromised pod has to terminate at a boundary the agent cannot cross — and shared infrastructure doesn't give you one.
 
 - **Hypervisor-level isolation between control plane and workers.** Minos (which holds credentials and dispatch authority) runs on a separate VM from Labyrinth (which runs the k3s cluster where pods execute). A pod escape stops at the Labyrinth VM boundary; it does not reach Minos's credential injection path or Postgres directly.
-- **Per-guest egress allowlist enforced by the Proxmox firewall.** Each VM has its own vNIC-level rules — Minos, Labyrinth, Postgres, and Ariadne each get only the egress they need. Self-contained on Crete; does not depend on the homelab edge firewall for Daedalus isolation.
+- **Per-guest egress allowlist enforced by the Proxmox firewall.** Each VM has its own vNIC-level rules — Minos, Labyrinth, Postgres, and Ariadne each get only the egress they need. Self-contained on Crete; does not depend on the homelab edge firewall for Zakros isolation.
 - **Internal traffic never leaves the host.** Minos ↔ Labyrinth, Minos ↔ Postgres, Minos ↔ Ariadne all traverse Proxmox virtual bridges. There is no path for those flows to be observed or intercepted on the physical network.
 - **Fast, local rollback.** Proxmox snapshots on a ZFS mirror let the operator revert a guest in seconds without coordinating with shared storage or other tenants.
 - **Capacity headroom that won't get reclaimed.** Phase 1 footprint is ~32 GB RAM / 10 vCPU; the box has substantial unused capacity reserved for Phase 2/3 growth (Apollo, Hecate, Charon, Asclepius) without contending with unrelated workloads.
@@ -99,10 +99,10 @@ See [`deploy/README.md`](deploy/README.md) for the 8-step runbook and the tear-d
 - HMAC bearer tokens for pod auth (Ed25519 JWT shape is prepared, swap is Phase 2).
 - Single admin, hardcoded in config.
 - Single project, hardcoded in config.
-- Claude OAuth token is deployment-scoped — every pod uses the operator's subscription. Spend cap is enforced at the Anthropic console, not by Daedalus.
+- Claude OAuth token is deployment-scoped — every pod uses the operator's subscription. Spend cap is enforced at the Anthropic console, not by Zakros.
 - GitHub PAT for worker push. Phase 2 replaces with short-lived GitHub App installation tokens.
 - File-backed secret provider, push-only; in-pod credential refresh is Phase 2 (Hecate).
-- Postgres LXC is a single point of failure — its loss quietly stalls the control plane. Phase 3 Asclepius adds Daedalus-native alerting; for now it's a homelab-operations concern.
+- Postgres LXC is a single point of failure — its loss quietly stalls the control plane. Phase 3 Asclepius adds Zakros-native alerting; for now it's a homelab-operations concern.
 
 ## Roadmap
 
@@ -125,7 +125,7 @@ Teams plugin, Athena dev sandboxes, Pythia research pods, and Asclepius health m
 
 ### Phase 3 — Expansion
 
-- **Asclepius** — broker health and drift detection, Daedalus-native alerting, recovery orchestration.
+- **Asclepius** — broker health and drift detection, Zakros-native alerting, recovery orchestration.
 - **Athena Development Sandboxes** — per-sandbox users, allocated port ranges, MCP-driven lifecycle. Depends on Calico + NetworkPolicy layering (also Phase 3).
 - Additional surfaces (Telegram, Matrix) as they appear.
 

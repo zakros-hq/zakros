@@ -1,5 +1,5 @@
 # Terraform provider configuration.
-# Daedalus creates its own SDN zone + VNet inside Crete — it does not
+# Zakros creates its own SDN zone + VNet inside Crete — it does not
 # depend on the wider homelab's VLANs. External egress flows through a
 # Crete-local OPNsense firewall provisioned from scratch via FreeBSD +
 # opnsense-bootstrap. Terraform-managed firewall rules via the
