@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/zakros-hq/zakros/pkg/audit"
 	"github.com/zakros-hq/zakros/pkg/brokerauth"
@@ -62,8 +63,18 @@ func (s *server) handleInstallationToken(w http.ResponseWriter, r *http.Request)
 		writeError(w, http.StatusBadRequest, "repo required (owner/name)")
 		return
 	}
+	// GitHub's POST /app/installations/{id}/access_tokens `repositories`
+	// parameter takes plain repo names, not owner/name pairs (slashes
+	// aren't valid repo names). The pod sends owner/name because
+	// that's what it has from envelope.Execution.RepoURL; we strip
+	// the owner here. Owner is captured in audit for cross-reference.
+	owner, repoName, ok := strings.Cut(body.Repo, "/")
+	if !ok || owner == "" || repoName == "" {
+		writeError(w, http.StatusBadRequest, "repo must be owner/name")
+		return
+	}
 
-	tok, err := s.github.MintInstallationToken(r.Context(), s.installationID, []string{body.Repo})
+	tok, err := s.github.MintInstallationToken(r.Context(), s.installationID, []string{repoName})
 	if err != nil {
 		s.audit.Emit(audit.Event{
 			Category: "github-broker",
