@@ -4,16 +4,19 @@
 # Avoids needing a remote registry during Phase 1.
 #
 # Run from the operator's workstation inside the repo root:
-#   LABYRINTH_HOST=172.16.140.102 deploy/images-push.sh
+#   deploy/images-push.sh
 #
 # Optional env:
+#   LABYRINTH_HOST=...           # default: labyrinth guest IP from `terraform output -json guests`
 #   IMAGE_TAG=local              # tag applied to both images
-#   REGISTRY_PREFIX=zakros     # image name prefix — keep unless you push elsewhere
-#   SSH_USER=zakros            # ssh user on labyrinth
+#   REGISTRY_PREFIX=zakros       # image name prefix — keep unless you push elsewhere
+#   SSH_USER=zakros              # ssh user on labyrinth
 
 set -euo pipefail
 
-: "${LABYRINTH_HOST:?must be set (e.g. 172.16.140.102)}"
+. "$(dirname "$0")/lib.sh"
+: "${LABYRINTH_HOST:=$(tf_guest_ip labyrinth 2>/dev/null || true)}"
+: "${LABYRINTH_HOST:?run terraform apply so the labyrinth guest is in state, or set LABYRINTH_HOST manually}"
 : "${IMAGE_TAG:=local}"
 : "${REGISTRY_PREFIX:=zakros}"
 : "${SSH_USER:=zakros}"

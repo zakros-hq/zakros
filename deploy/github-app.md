@@ -64,7 +64,8 @@ Push a test commit to a watched repo, or click **Redeliver** on any
 past delivery in the GitHub App → Advanced → Recent Deliveries page.
 
 ```sh
-ssh zakros@172.16.140.101 'sudo journalctl -u minos --since "1 minute ago" --no-pager | grep -iE "webhook|cerberus"'
+MINOS=$(terraform -chdir=terraform output -json guests | jq -r '.minos.ip')
+ssh zakros@$MINOS 'sudo journalctl -u minos --since "1 minute ago" --no-pager | grep -iE "webhook|cerberus"'
 ```
 
 Should see a cerberus-category audit line confirming the delivery was

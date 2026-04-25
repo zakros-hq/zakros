@@ -4,8 +4,16 @@ Bootstrap scripts for the four Zakros guests after Terraform has
 provisioned them on Crete. All scripts are idempotent — safe to re-run
 after fixing config or adjusting env.
 
-Assumes the flat-VLAN topology (VLAN 140, 172.16.140.0/24, DHCP). Current
-IPs: postgres .100, minos .101, labyrinth .102, clio .103.
+Assumes the flat-VLAN topology (VLAN 140, 172.16.140.0/24, DHCP). Per-guest
+IPs are not stable across `tf-destroy/tf-apply` cycles — the install
+scripts read them from `terraform output -json guests` (helper in
+[`deploy/lib.sh`](lib.sh)). Override with `MINOS_HOST=<ip>` etc. when
+needed.
+
+The Postgres LXC IP isn't in TF output (the Proxmox provider doesn't
+surface LXC runtime IPs); look it up with
+`ssh root@<crete> pct exec 211 -- ip -4 addr show eth0` or from the
+homelab router's DHCP leases.
 
 ## Teardown and rebuild from scratch
 
@@ -40,12 +48,12 @@ ssh root@172.16.30.103 "rm -f /var/lib/vz/template/iso/noble-server-cloudimg-amd
 
 **Fresh bring-up** from a clean destroy:
 
-1. `make tf-apply` — provisions guests.
-2. Check the homelab router's DHCP lease table to confirm IPs. MAC
-   addresses are deterministic from `vm_id` + `ip_offset`, so if the
-   router does MAC-based reservations, IPs stay at
-   `.100 / .101 / .102 / .103`. If not, update the addresses in
-   `deploy/config.json` (database_url, minos_pod_url) to match.
+1. `make tf-apply` — provisions guests. Once qemu-guest-agent reports,
+   `terraform output -json guests` returns the live IPs and the install
+   scripts pick them up automatically.
+2. Look up the Postgres LXC IP separately (TF doesn't surface it — see
+   above) and update `deploy/config.json` (`database_url`,
+   `minos_pod_url`) if either has changed.
 3. Run **sections 1–8 below in order** using your existing
    `deploy/secrets.json` + `deploy/config.json`. Each script is
    idempotent, so if any step fails mid-run you re-run it after the fix.
@@ -64,33 +72,38 @@ ssh root@172.16.30.103 \
   < deploy/postgres-bootstrap.sh
 ```
 
-Then run migrations from your workstation:
+Then run migrations from your workstation (substitute the LXC IP you
+looked up):
 
 ```sh
 go install github.com/pressly/goose/v3/cmd/goose@latest
-DSN="postgres://zakros:$POSTGRES_PASSWORD@172.16.140.100:5432/zakros?sslmode=disable"
+DSN="postgres://zakros:$POSTGRES_PASSWORD@<postgres-lxc-ip>:5432/zakros?sslmode=disable"
 ~/go/bin/goose -dir minos/storage/pgstore/migrations postgres "$DSN" up
 ```
 
 ## 2. k3s on labyrinth (vmid 212)
 
 ```sh
-ssh zakros@172.16.140.102 'sudo bash -s' < deploy/k3s-install.sh
+LABYRINTH=$(terraform -chdir=terraform output -json guests | jq -r '.labyrinth.ip')
+
+ssh zakros@$LABYRINTH 'sudo bash -s' < deploy/k3s-install.sh
 
 # pull kubeconfig back
-scp zakros@172.16.140.102:/etc/rancher/k3s/k3s.yaml ~/.kube/zakros.yaml
-sed -i '' 's/127.0.0.1/172.16.140.102/' ~/.kube/zakros.yaml  # drop '' on Linux
+scp zakros@$LABYRINTH:/etc/rancher/k3s/k3s.yaml ~/.kube/zakros.yaml
+sed -i '' "s/127.0.0.1/$LABYRINTH/" ~/.kube/zakros.yaml  # drop '' on Linux
 KUBECONFIG=~/.kube/zakros.yaml kubectl get nodes
 ```
 
 ## 3. Worker images → labyrinth's containerd
 
 ```sh
-LABYRINTH_HOST=172.16.140.102 deploy/images-push.sh
+deploy/images-push.sh
 ```
 
 Builds `zakros/claude-code:local` + `zakros/argus-sidecar:local` locally,
 scps tars, imports into k3s's containerd. No remote registry needed.
+The labyrinth host IP is read from `terraform output -json guests`;
+override with `LABYRINTH_HOST=<ip> deploy/images-push.sh` if needed.
 
 ## 4. Minos on minos VM (vmid 210)
 
@@ -119,7 +132,8 @@ Then:
 deploy/minos-install.sh
 
 # tail logs
-ssh zakros@172.16.140.101 'sudo journalctl -u minos -f'
+MINOS=$(terraform -chdir=terraform output -json guests | jq -r '.minos.ip')
+ssh zakros@$MINOS 'sudo journalctl -u minos -f'
 ```
 
 The script builds `bin/minos`, scps it + config + secrets + kubeconfig,

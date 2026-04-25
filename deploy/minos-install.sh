@@ -11,13 +11,15 @@
 #   * ~/.kube/zakros.yaml — the labyrinth kubeconfig from k3s-install
 #
 # Env:
-#   MINOS_HOST      default 172.16.140.101
+#   MINOS_HOST      default: minos guest IP from `terraform output -json guests`
 #   SSH_USER        default zakros
 #   KUBECONFIG_SRC  default ~/.kube/zakros.yaml
 
 set -euo pipefail
 
-: "${MINOS_HOST:=172.16.140.101}"
+. "$(dirname "$0")/lib.sh"
+: "${MINOS_HOST:=$(tf_guest_ip minos 2>/dev/null || true)}"
+: "${MINOS_HOST:?run terraform apply so the minos guest is in state, or set MINOS_HOST manually}"
 : "${SSH_USER:=zakros}"
 : "${KUBECONFIG_SRC:=$HOME/.kube/zakros.yaml}"
 

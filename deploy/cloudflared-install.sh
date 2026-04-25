@@ -16,7 +16,7 @@
 #   CLOUDFLARED_TOKEN='<the long token>' deploy/cloudflared-install.sh
 #
 # Env:
-#   MINOS_HOST           default 172.16.140.101
+#   MINOS_HOST           default: minos guest IP from `terraform output -json guests`
 #   SSH_USER             default zakros
 #   CLOUDFLARED_TOKEN    optional — tunnel token. Defaults to the
 #                        `cloudflared/tunnel-token` entry in
@@ -25,7 +25,9 @@
 
 set -euo pipefail
 
-: "${MINOS_HOST:=172.16.140.101}"
+. "$(dirname "$0")/lib.sh"
+: "${MINOS_HOST:=$(tf_guest_ip minos 2>/dev/null || true)}"
+: "${MINOS_HOST:?run terraform apply so the minos guest is in state, or set MINOS_HOST manually}"
 : "${SSH_USER:=zakros}"
 
 # Fall back to secrets.json if env var isn't set.
