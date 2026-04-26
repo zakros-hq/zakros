@@ -1,7 +1,8 @@
 .PHONY: help all build test vet lint fmt tidy clean \
         dev-postgres dev-postgres-stop dev-k3d dev-k3d-stop \
         plugin-claude-code plugin-shellcheck sidecar-argus \
-        tf-fmt tf-validate tf-plan tf-apply tf-apply-firewall tf-destroy tf-inventory
+        tf-fmt tf-validate tf-plan tf-apply tf-apply-firewall tf-destroy tf-inventory \
+        rebuild rebuild-from-scratch
 
 GO := go
 LINTER := golangci-lint
@@ -97,3 +98,11 @@ tf-destroy: ## terraform destroy — tears down every Zakros guest + SDN on Cret
 tf-inventory: ## Dump the Terraform-generated guest inventory to ./inventory.yaml
 	cd terraform && terraform output -raw guests_yaml > ../inventory.yaml
 	@echo "Wrote inventory.yaml"
+
+# -- Full-stack rebuild ------------------------------------------------
+
+rebuild: ## Re-run the full deploy chain over existing infra (idempotent — tf-apply + bootstrap + push)
+	deploy/rebuild.sh
+
+rebuild-from-scratch: ## Cold rebuild — tf-destroy + tf-apply + full bootstrap + push (uses persistent secrets in deploy/secrets.json)
+	deploy/rebuild.sh --from-scratch

@@ -13,6 +13,31 @@ returns (LXC via the bpg/proxmox provider's `wait_for_ip` block).
 
 ## Teardown and rebuild from scratch
 
+After each phase slice, validate the latest changes by rebuilding the
+whole stack. Two flavors:
+
+```sh
+make rebuild                 # tf-apply + bootstrap chain (over existing infra)
+make rebuild-from-scratch    # tf-destroy + tf-apply + bootstrap chain (cold)
+```
+
+Both run [`deploy/rebuild.sh`](rebuild.sh), which:
+
+1. Runs `make tf-apply` (or `tf-destroy && tf-apply` for `--from-scratch`)
+2. Rewrites the IP-bearing fields in `deploy/config.json` from
+   `terraform output -json guests` — preserves the postgres password
+   you put in `database_url` and every other field
+3. Runs sections 1–8 below in order (postgres bootstrap, migrations,
+   k3s, image push, minos, github-broker, cloudflared, iris)
+4. Mints Iris's JWT with `minosctl mint-iris-token` and writes it back
+   into `deploy/secrets.json` automatically
+
+The script reads persistent credentials out of `deploy/secrets.json`
+(gitignored) — operator must seed those once. The postgres password
+lives in `database_url` in `deploy/config.json` (also gitignored); the
+script extracts it and re-applies it to the freshly-bootstrapped LXC.
+First-time setup follows the manual sections below.
+
 **What persists** across a teardown/rebuild — do not delete:
 
 - Cloudflare Tunnel registration + hostname route (reuse the same token)
@@ -42,17 +67,10 @@ cache across rebuilds and speed up the next apply):
 ssh root@172.16.30.103 "rm -f /var/lib/vz/template/iso/noble-server-cloudimg-amd64.img"
 ```
 
-**Fresh bring-up** from a clean destroy:
-
-1. `make tf-apply` — provisions guests. `wait_for_ip` on the LXC and
-   qemu-guest-agent on the VMs both surface IPs to TF state by the time
-   apply returns; install scripts and `terraform output -json guests`
-   pick them up automatically.
-2. If `deploy/config.json` (`database_url`, `minos_pod_url`) was last
-   filled by hand and IPs have shifted, update those fields to match.
-3. Run **sections 1–8 below in order** using your existing
-   `deploy/secrets.json` + `deploy/config.json`. Each script is
-   idempotent, so if any step fails mid-run you re-run it after the fix.
+**Fresh bring-up** from a clean destroy: just `make rebuild-from-scratch`.
+Sections 1–8 below are still the per-step source of truth (and what to
+re-run by hand if a single phase fails mid-rebuild) — each script is
+idempotent.
 
 Expected total time for a cold rebuild: ~20 minutes (mostly Postgres +
 apt-upgrade waits; nothing interactive).
