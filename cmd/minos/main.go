@@ -19,7 +19,6 @@ import (
 	mnemocore "github.com/zakros-hq/zakros/mnemosyne/core"
 	mnemomem "github.com/zakros-hq/zakros/mnemosyne/memstore"
 	mnemopg "github.com/zakros-hq/zakros/mnemosyne/pgstore"
-	"github.com/zakros-hq/zakros/minos/argus"
 	"github.com/zakros-hq/zakros/minos/core"
 	"github.com/zakros-hq/zakros/minos/dispatch"
 	"github.com/zakros-hq/zakros/minos/dispatch/fakedispatch"
@@ -86,15 +85,9 @@ func run(configPath, providerPath string, memMode, fakeDispatch bool, kubeconfig
 		return err
 	}
 
-	a, err := argus.New(argus.DefaultConfig(), dispatcher, store, hermes, em)
-	if err != nil {
-		return fmt.Errorf("argus: %w", err)
-	}
-	if pool != nil {
-		a.WithPersister(argus.NewPGPersister(pool))
-	} else {
-		a.WithPersister(argus.NewMemPersister())
-	}
+	// Slice J: Argus extracts to cmd/argus with its own systemd unit;
+	// Minos no longer bundles the watcher. Heartbeat ingest moves to
+	// the Argus binary's HTTP surface.
 
 	mnemosyne := openMnemosyne(pool, memMode)
 	identities := openIdentityStore(pool, memMode)
@@ -102,7 +95,6 @@ func run(configPath, providerPath string, memMode, fakeDispatch bool, kubeconfig
 
 	opts := []core.Option{
 		core.WithReplayStore(replayStore),
-		core.WithArgus(a),
 		core.WithMnemosyne(mnemosyne),
 		core.WithIdentities(identities),
 		core.WithProjects(projects),
@@ -126,9 +118,6 @@ func run(configPath, providerPath string, memMode, fakeDispatch bool, kubeconfig
 			_ = hermes.Stop(shutdownCtx)
 		}()
 	}
-	a.Start(ctx)
-	defer a.Stop()
-
 	if err := srv.Run(ctx); err != nil && err != context.Canceled {
 		return err
 	}

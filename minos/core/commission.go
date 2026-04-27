@@ -274,9 +274,8 @@ func (s *Server) dispatch(ctx context.Context, task *storage.Task) error {
 		Outcome:  "spawned",
 		Fields:   map[string]string{"task_id": task.ID.String(), "run_id": runID.String(), "pod_name": spec.Name},
 	})
-	if s.argus != nil {
-		s.argus.TrackTask(task, s.namespace)
-	}
+	// Argus picks up newly-running tasks via its own discover() loop
+	// against the shared task store (Slice J extraction).
 	return nil
 }
 
@@ -337,11 +336,13 @@ func (s *Server) composeCapabilities(ctx context.Context, taskID uuid.UUID, proj
 	injected := append([]envelope.InjectedCredential(nil), proj.Capabilities.InjectedCredentials...)
 
 	// Audience is the union of "minos" (so the pod can post lifecycle
-	// callbacks like PR / heartbeat / memory / narration) plus every
-	// project-configured broker endpoint. Scopes mirror.
-	audience := []string{"minos"}
+	// callbacks like PR / memory / narration), "argus" (so the pod
+	// can heartbeat to the extracted Argus binary post-Slice J), and
+	// every project-configured broker endpoint. Scopes mirror.
+	audience := []string{"minos", "argus"}
 	scopes := map[string][]string{
 		"minos": {"task.lifecycle"},
+		"argus": {"heartbeat"},
 	}
 	for _, ep := range endpoints {
 		audience = append(audience, ep.Name)

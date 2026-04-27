@@ -81,13 +81,17 @@ func BuildPodSpec(ctx context.Context, in BuilderInput) (PodSpec, error) {
 	}
 
 	plainEnv := map[string]string{
-		"ZAKROS_ENVELOPE":       EnvelopePath,
-		"ZAKROS_TASK_ID":        in.TaskID.String(),
-		"ZAKROS_RUN_ID":         in.RunID.String(),
-		"ZAKROS_PROJECT_ID":     in.ProjectID,
-		"ZAKROS_THREAD_URL":     in.Envelope.Communication.HermesURL,
-		"ZAKROS_ARGUS_INGEST":   in.Envelope.Communication.ArgusIngestURL,
-		"ZAKROS_CLIO_INGEST": in.Envelope.Communication.ClioIngestURL,
+		"ZAKROS_ENVELOPE":          EnvelopePath,
+		"ZAKROS_TASK_ID":           in.TaskID.String(),
+		"ZAKROS_RUN_ID":            in.RunID.String(),
+		"ZAKROS_PROJECT_ID":        in.ProjectID,
+		"ZAKROS_THREAD_URL":        in.Envelope.Communication.HermesURL,
+		// Slice J: Argus runs as its own binary on the Minos VM. Pods +
+		// the Argus-sidecar POST heartbeats to the broker's
+		// /argus/heartbeat endpoint instead of Minos's old
+		// /tasks/{id}/heartbeat.
+		"ZAKROS_ARGUS_INGEST_URL":  in.Envelope.Communication.ArgusIngestURL,
+		"ZAKROS_CLIO_INGEST":       in.Envelope.Communication.ClioIngestURL,
 	}
 	if in.MinosURL != "" {
 		plainEnv["ZAKROS_MINOS_URL"] = in.MinosURL

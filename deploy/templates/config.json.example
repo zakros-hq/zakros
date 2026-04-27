@@ -5,9 +5,11 @@
   "signing_key_ref": "minos/signing-key",
   "admin_token_ref": "minos/admin-token",
   "github_webhook_secret_ref": "cerberus/github-webhook",
+  "slack_webhook_secret_ref": "cerberus/slack-signing-secret",
 
   "minos_pod_url": "http://172.16.140.101:8080",
   "github_broker_pod_url": "http://172.16.140.101:8082",
+  "argus_url": "http://127.0.0.1:8083",
 
   "admins": [
     {
@@ -31,7 +33,8 @@
       "max_tool_calls": 200
     },
     "communication": {
-      "thread_surface": "discord"
+      "thread_surface": "discord",
+      "argus_ingest_url": "http://172.16.140.101:8083"
     },
     "thread_parent": "REPLACE_DISCORD_CHANNEL_ID",
     "capabilities": {

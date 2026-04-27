@@ -1,0 +1,9 @@
+{
+  "listen_addr": ":8083",
+  "secrets_file": "/etc/zakros/secrets.json",
+  "signing_key_pub_ref": "minos/signing-key-pub",
+  "database_url": "REPLACE_DATABASE_URL",
+  "kubeconfig_path": "/etc/minos/kubeconfig",
+  "namespace": "zakros",
+  "minos_url": "http://127.0.0.1:8080"
+}

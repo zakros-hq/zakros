@@ -304,8 +304,71 @@ func (a *Argus) runLoop(ctx context.Context, stopC <-chan struct{}) {
 		case <-stopC:
 			return
 		case <-ticker.C:
+			a.discover(ctx)
 			a.evaluate(ctx)
 		}
+	}
+}
+
+// discover ensures every task in StateRunning is tracked. This was the
+// in-process callers' job (Minos called TrackTask on dispatch); after
+// the Slice J extraction Argus owns the discovery itself by polling
+// the shared task store. Untracked-but-running tasks get a fresh State
+// using the task's stored start time so warning/escalation thresholds
+// are accurate even if the pod was running before Argus came up.
+func (a *Argus) discover(ctx context.Context) {
+	running, err := a.store.ListTasks(ctx, []storage.State{storage.StateRunning}, 0)
+	if err != nil {
+		a.audit.Emit(audit.Event{
+			Category: "argus", Outcome: "discover-failed",
+			Message: err.Error(),
+		})
+		return
+	}
+	for _, t := range running {
+		a.mu.Lock()
+		_, exists := a.pods[t.ID]
+		a.mu.Unlock()
+		if exists {
+			continue
+		}
+		if t.Envelope == nil || t.PodName == nil || t.RunID == nil {
+			continue
+		}
+		startedAt := t.StartedAt
+		if startedAt == nil || startedAt.IsZero() {
+			startedAt = &t.CreatedAt
+		}
+		max := time.Duration(t.Envelope.Budget.MaxWallClockSeconds) * time.Second
+		warnPct := t.Envelope.Budget.WarningThresholdPct
+		if warnPct == 0 {
+			warnPct = a.cfg.WarningThresholdPct
+		}
+		escPct := t.Envelope.Budget.EscalationThresholdPct
+		if escPct == 0 {
+			escPct = a.cfg.EscalationThresholdPct
+		}
+		st := &State{
+			TaskID:        t.ID,
+			RunID:         *t.RunID,
+			PodName:       *t.PodName,
+			Namespace:     "zakros",
+			ThreadSurface: t.Envelope.Communication.ThreadSurface,
+			ThreadRef:     t.Envelope.Communication.ThreadRef,
+			StartedAt:     *startedAt,
+			LastHeartbeat: a.now(),
+			MaxWallClock:  max,
+			WarningAt:     (max * time.Duration(warnPct)) / 100,
+			EscalationAt:  (max * time.Duration(escPct)) / 100,
+		}
+		a.mu.Lock()
+		a.pods[t.ID] = st
+		a.mu.Unlock()
+		a.persistOne(st)
+		a.audit.Emit(audit.Event{
+			Category: "argus", Outcome: "discovered",
+			Fields: map[string]string{"task_id": t.ID.String(), "pod": *t.PodName},
+		})
 	}
 }
 

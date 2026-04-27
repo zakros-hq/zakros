@@ -2,6 +2,10 @@
 // Phase 1 ingress is Cloudflare Tunnel → Cerberus-as-library-in-Minos;
 // this verifier enforces HMAC-SHA256 over the raw body plus delivery-ID
 // replay protection against a caller-supplied store.
+//
+// Slice J: github.Verifier now satisfies the cerberus/verification.Verifier
+// interface so Cerberus can route /webhooks/github through the plugin
+// dispatch layer alongside Slice J's slack signing verifier.
 package github
 
 import (
@@ -15,18 +19,17 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/zakros-hq/zakros/cerberus/verification"
 )
 
-// ErrInvalidSignature indicates the X-Hub-Signature-256 header did not
-// match HMAC-SHA256(secret, body).
-var ErrInvalidSignature = errors.New("github webhook: invalid signature")
-
-// ErrMissingHeader is returned when a required webhook header is absent.
-var ErrMissingHeader = errors.New("github webhook: missing header")
-
-// ErrReplay is returned when the X-GitHub-Delivery ID has already been
-// seen inside the replay window.
-var ErrReplay = errors.New("github webhook: duplicate delivery")
+// ErrInvalidSignature aliases verification.ErrInvalidSignature so call
+// sites can errors.Is against either; same for the others.
+var (
+	ErrInvalidSignature = verification.ErrInvalidSignature
+	ErrMissingHeader    = verification.ErrMissingHeader
+	ErrReplay           = verification.ErrReplay
+)
 
 // ReplayStore tracks delivery IDs for replay protection. Production
 // implementations live alongside Minos's Postgres (shared `cerberus`
@@ -61,17 +64,18 @@ func (v *Verifier) WithClock(now func() time.Time) *Verifier {
 	return v
 }
 
-// Event is a parsed webhook event ready for handlers.
-type Event struct {
-	Type       string
-	DeliveryID string
-	Body       []byte
-}
+// Event is the verified-and-parsed webhook event. Aliased to
+// verification.Event so shared call sites use one type.
+type Event = verification.Event
+
+// Name implements verification.Verifier — Cerberus routes
+// /webhooks/github through this plugin.
+func (v *Verifier) Name() string { return "github" }
 
 // Verify consumes the request, validates the signature and delivery ID,
 // and returns a parsed Event. The request body is fully drained — callers
 // MUST NOT read from r.Body afterwards.
-func (v *Verifier) Verify(ctx context.Context, r *http.Request) (*Event, error) {
+func (v *Verifier) Verify(ctx context.Context, r *http.Request) (*verification.Event, error) {
 	if v == nil || len(v.secret) == 0 {
 		return nil, errors.New("github webhook: verifier not configured")
 	}
@@ -108,12 +112,16 @@ func (v *Verifier) Verify(ctx context.Context, r *http.Request) (*Event, error) 
 		}
 	}
 
-	return &Event{
+	return &verification.Event{
+		Source:     "github",
 		Type:       eventType,
 		DeliveryID: delivery,
 		Body:       body,
 	}, nil
 }
+
+// _ compile-time assertion that *Verifier satisfies verification.Verifier.
+var _ verification.Verifier = (*Verifier)(nil)
 
 // verifyHMAC is separated so unit tests can exercise edge cases without
 // building an http.Request every time.

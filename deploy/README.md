@@ -241,6 +241,35 @@ The broker listens on `:8082` and the worker pod hits it via
 `ZAKROS_GITHUB_BROKER_URL` (configured in `config.json` →
 `github_broker_pod_url`).
 
+### 7c. argus daemon (Slice J extraction)
+
+Runs on the Minos VM alongside Minos and the github-broker. Owns
+the rules engine + heartbeat ingest + push-event ingest as its own
+systemd unit. Minos no longer bundles the watcher; pods POST
+heartbeats to Argus's `/argus/heartbeat` directly.
+
+Copy the broker config template:
+
+```sh
+cp deploy/templates/argus.json.example deploy/argus.json
+# edit deploy/argus.json:
+#   database_url — copy from deploy/config.json (same shared LXC)
+```
+
+Then:
+
+```sh
+deploy/argus-install.sh
+
+# tail logs
+ssh zakros@$MINOS 'sudo journalctl -u argus -f'
+```
+
+Argus listens on `:8083`. Worker pods + the Argus-sidecar inject
+the URL via `ZAKROS_ARGUS_INGEST_URL` (configured in `config.json` →
+`project.communication.argus_ingest_url`). Mutual `/healthz` between
+Minos and Argus surfaces transitions in both audit streams.
+
 ## 8. Iris conversational pod
 
 Iris is a long-running pod in labyrinth that long-polls Hermes for

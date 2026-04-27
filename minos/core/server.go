@@ -15,7 +15,6 @@ import (
 	ghverify "github.com/zakros-hq/zakros/cerberus/verification/github"
 	hermescore "github.com/zakros-hq/zakros/hermes/core"
 	mnemocore "github.com/zakros-hq/zakros/mnemosyne/core"
-	"github.com/zakros-hq/zakros/minos/argus"
 	"github.com/zakros-hq/zakros/minos/dispatch"
 	"github.com/zakros-hq/zakros/minos/identity"
 	"github.com/zakros-hq/zakros/minos/project"
@@ -35,7 +34,6 @@ type Server struct {
 	audit       audit.Emitter
 	replayStore ghverify.ReplayStore
 	hermes      *hermescore.Broker
-	argus       *argus.Argus
 	mnemosyne   mnemocore.Store
 	namespace   string
 	now         func() time.Time
@@ -91,13 +89,6 @@ func WithReplayStore(rs ghverify.ReplayStore) Option {
 // surface integration (Slice A posture; CLI intake only).
 func WithHermes(h *hermescore.Broker) Option {
 	return func(s *Server) { s.hermes = h }
-}
-
-// WithArgus wires the bundled watcher so Commission registers new tasks
-// with it and the heartbeat endpoint can deliver sidecar reports.
-// When nil, Argus enforcement is disabled (Slice A posture).
-func WithArgus(a *argus.Argus) Option {
-	return func(s *Server) { s.argus = a }
 }
 
 // WithMnemosyne wires the memory service so Commission populates
@@ -242,6 +233,12 @@ func (s *Server) Run(ctx context.Context) error {
 
 	// Background sweeper for awaiting-review TTLs.
 	go s.runHibernationSweeper(ctx)
+
+	// Mutual health monitor against the extracted Argus binary
+	// (Slice J). Argus runs the symmetric monitor against Minos.
+	if s.cfg.ArgusURL != "" {
+		go s.runArgusHealthMonitor(ctx)
+	}
 
 	select {
 	case err, ok := <-listenErr:

@@ -41,3 +41,4 @@ deploy/config.json
 deploy/secrets.json
 deploy/github-broker.json
 /github-broker
+/argus

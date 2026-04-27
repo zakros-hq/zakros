@@ -1,0 +1,22 @@
+[Unit]
+Description=Zakros Argus watcher (extracted Slice J)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=zakros
+Group=zakros
+ExecStart=/usr/local/bin/argus \
+  -config /etc/zakros/argus.json
+Restart=on-failure
+RestartSec=5s
+
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

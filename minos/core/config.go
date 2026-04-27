@@ -23,6 +23,10 @@ type Config struct {
 	SigningKeyRef          string        `json:"signing_key_ref"`
 	AdminTokenRef          string        `json:"admin_token_ref"`
 	GithubWebhookSecretRef string        `json:"github_webhook_secret_ref"`
+	// SlackWebhookSecretRef is the secret-provider reference whose
+	// value is the Slack app's signing secret (Slice J). Optional —
+	// when empty, /webhooks/slack returns 503 (no Slack plugin yet).
+	SlackWebhookSecretRef string         `json:"slack_webhook_secret_ref"`
 	// MinosPodURL is the Minos API URL as seen from inside a Labyrinth
 	// pod. Injected into the pod as ZAKROS_MINOS_URL so the entrypoint
 	// can POST /tasks/{id}/pr after opening the PR.
@@ -32,6 +36,10 @@ type Config struct {
 	// entrypoint can mint a per-task installation token. Slice F
 	// default: same VM as Minos, port 8082.
 	GitHubBrokerPodURL string `json:"github_broker_pod_url"`
+	// ArgusURL is the Argus binary's HTTP base URL on the Minos VM
+	// (Slice J extraction). Used by Minos's mutual health monitor —
+	// empty disables the cross-monitor goroutine.
+	ArgusURL string `json:"argus_url"`
 	// Admins seeds the identity registry on first start with these
 	// (surface, surface_id) tuples as role=admin. Adding/removing
 	// entries here only affects bootstrap of new tuples; existing

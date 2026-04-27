@@ -1,15 +1,20 @@
 // Command zakros-argus-sidecar runs as a sidecar container in every
-// Daedalus pod and emits a heartbeat to Minos's /tasks/{id}/heartbeat
-// endpoint on a configurable interval. The sidecar is separate from the
-// worker backend per architecture.md §8 Pod Sidecars so a hung or
-// compromised worker cannot suppress its heartbeat.
+// Daedalus pod and emits a heartbeat to the Argus binary's
+// /argus/heartbeat endpoint on a configurable interval. The sidecar
+// is separate from the worker backend per architecture.md §8 Pod
+// Sidecars so a hung or compromised worker cannot suppress its
+// heartbeat.
+//
+// Slice J: heartbeat ingest moved off Minos and onto the extracted
+// Argus binary. The pod's MCP_AUTH_TOKEN JWT carries audience=argus +
+// scope=heartbeat; Argus's brokerauth.Verifier checks both.
 package main
 
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"flag"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -24,22 +29,26 @@ func main() {
 	timeout := flag.Duration("timeout", 5*time.Second, "per-heartbeat HTTP timeout")
 	flag.Parse()
 
-	minosURL := strings.TrimRight(os.Getenv("ZAKROS_MINOS_URL"), "/")
+	argusURL := strings.TrimRight(os.Getenv("ZAKROS_ARGUS_INGEST_URL"), "/")
 	taskID := os.Getenv("ZAKROS_TASK_ID")
 	token := os.Getenv("MCP_AUTH_TOKEN")
-	if minosURL == "" || taskID == "" || token == "" {
-		log.Fatal("ZAKROS_MINOS_URL, ZAKROS_TASK_ID, and MCP_AUTH_TOKEN must all be set")
+	if argusURL == "" || taskID == "" || token == "" {
+		log.Fatal("ZAKROS_ARGUS_INGEST_URL, ZAKROS_TASK_ID, and MCP_AUTH_TOKEN must all be set")
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	url := fmt.Sprintf("%s/tasks/%s/heartbeat", minosURL, taskID)
+	url := argusURL + "/argus/heartbeat"
+	body, err := json.Marshal(map[string]string{"task_id": taskID})
+	if err != nil {
+		log.Fatalf("encode heartbeat body: %v", err)
+	}
 	client := &http.Client{Timeout: *timeout}
 
-	// Send one immediately so Minos sees the sidecar alive without waiting
+	// Send one immediately so Argus sees the sidecar alive without waiting
 	// a full interval.
-	sendBeat(ctx, client, url, token)
+	sendBeat(ctx, client, url, token, body)
 
 	ticker := time.NewTicker(*interval)
 	defer ticker.Stop()
@@ -49,18 +58,19 @@ func main() {
 			log.Printf("argus sidecar exiting: %v", ctx.Err())
 			return
 		case <-ticker.C:
-			sendBeat(ctx, client, url, token)
+			sendBeat(ctx, client, url, token, body)
 		}
 	}
 }
 
-func sendBeat(ctx context.Context, client *http.Client, url, token string) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(nil))
+func sendBeat(ctx context.Context, client *http.Client, url, token string, body []byte) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		log.Printf("argus sidecar: build request: %v", err)
 		return
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
 	resp, err := client.Do(req)
 	if err != nil {
 		log.Printf("argus sidecar: heartbeat: %v", err)
