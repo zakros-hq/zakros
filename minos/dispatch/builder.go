@@ -37,6 +37,12 @@ type BuilderInput struct {
 	// `clone` step. Slice F default: same VM as Minos, port 8082.
 	GitHubBrokerURL string
 
+	// HecateURL is the pod-reachable URL of cmd/hecate (Slice H1).
+	// Empty disables Hecate-resolved credentials — pods that have any
+	// HecateCredentials in their envelope will fail at startup if it's
+	// not set.
+	HecateURL string
+
 	// ArgusSidecarImage, when set, adds the Argus heartbeat sidecar
 	// container to the pod. Empty disables the sidecar (Slice A posture).
 	ArgusSidecarImage string
@@ -98,6 +104,20 @@ func BuildPodSpec(ctx context.Context, in BuilderInput) (PodSpec, error) {
 	}
 	if in.GitHubBrokerURL != "" {
 		plainEnv["ZAKROS_GITHUB_BROKER_URL"] = in.GitHubBrokerURL
+	}
+	if in.HecateURL != "" {
+		plainEnv["ZAKROS_HECATE_URL"] = in.HecateURL
+	}
+	// Slice H1: pod-side credential fetch list. Marshalled as JSON
+	// so the entrypoint can decode it without parsing CSV-with-
+	// commas-in-env-var-names. Empty when no HecateCredentials are
+	// configured.
+	if len(in.Envelope.Capabilities.HecateCredentials) > 0 {
+		spec, err := json.Marshal(in.Envelope.Capabilities.HecateCredentials)
+		if err != nil {
+			return PodSpec{}, fmt.Errorf("dispatch: marshal hecate credentials: %w", err)
+		}
+		plainEnv["ZAKROS_HECATE_FETCHES"] = string(spec)
 	}
 	if in.Envelope.Capabilities.McpAuthToken != "" {
 		secretEnv["MCP_AUTH_TOKEN"] = in.Envelope.Capabilities.McpAuthToken

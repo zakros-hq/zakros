@@ -36,6 +36,12 @@ type Config struct {
 	// entrypoint can mint a per-task installation token. Slice F
 	// default: same VM as Minos, port 8082.
 	GitHubBrokerPodURL string `json:"github_broker_pod_url"`
+	// HecatePodURL is the Hecate broker URL as seen from inside a
+	// Labyrinth pod (Slice H1). Injected as ZAKROS_HECATE_URL so the
+	// entrypoint can fetch HecateCredentials at startup. Default:
+	// http://172.16.140.101:8084 when Hecate is co-located with
+	// Minos on the Minos VM (current Slice H1 deploy shape).
+	HecatePodURL string `json:"hecate_pod_url"`
 	// ArgusURL is the Argus binary's HTTP base URL on the Minos VM
 	// (Slice J extraction). Used by Minos's mutual health monitor —
 	// empty disables the cross-monitor goroutine.
@@ -136,6 +142,7 @@ type ProjectConfig struct {
 // into every task envelope for this project.
 type CapabilitiesDefaults struct {
 	InjectedCredentials []envelope.InjectedCredential `json:"injected_credentials"`
+	HecateCredentials   []envelope.HecateCredential   `json:"hecate_credentials,omitempty"`
 	McpEndpoints        []envelope.McpEndpoint        `json:"mcp_endpoints"`
 }
 

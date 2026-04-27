@@ -1,0 +1,8 @@
+{
+  "listen_addr": ":8084",
+  "secrets_file": "/etc/zakros/secrets.json",
+  "signing_key_pub_ref": "minos/signing-key-pub",
+  "vault_addr": "REPLACE_OPENBAO_URL",
+  "vault_token_ref": "hecate/vault-token",
+  "vault_kv_mount": "secret"
+}

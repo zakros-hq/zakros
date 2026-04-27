@@ -37,6 +37,7 @@ type Project struct {
 // every task envelope this project commissions.
 type Capabilities struct {
 	InjectedCredentials []envelope.InjectedCredential
+	HecateCredentials   []envelope.HecateCredential
 	McpEndpoints        []envelope.McpEndpoint
 }
 

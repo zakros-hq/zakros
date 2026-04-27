@@ -100,6 +100,13 @@ type Communication struct {
 // may call under the accompanying JWT (Phase 2) or bearer token (Phase 1).
 type Capabilities struct {
 	InjectedCredentials []InjectedCredential `json:"injected_credentials"`
+	// HecateCredentials are credentials the pod fetches itself at
+	// startup from the Hecate broker (Slice H1). Each entry adds a
+	// `credentials.fetch:<ref>` scope to the pod JWT and an entry to
+	// the pod-visible env spec. Operators migrate from
+	// InjectedCredentials to HecateCredentials as the team's Vault
+	// posture allows; the two coexist.
+	HecateCredentials   []HecateCredential   `json:"hecate_credentials,omitempty"`
 	McpEndpoints        []McpEndpoint        `json:"mcp_endpoints"`
 	// McpAuthToken is the bearer (Phase 1) or Minos-minted JWT (Phase 2) the
 	// pod presents to every MCP broker it calls. Scopes on the token must
@@ -112,6 +119,14 @@ type Capabilities struct {
 type InjectedCredential struct {
 	EnvVar         string `json:"env_var"`
 	CredentialsRef string `json:"credentials_ref"`
+}
+
+// HecateCredential names a Vault KV reference (slash-free, matching
+// Vault's `secret/data/<ref>` path convention) and the environment
+// variable the pod should expose it under after fetching from Hecate.
+type HecateCredential struct {
+	EnvVar string `json:"env_var"`
+	Ref    string `json:"ref"`
 }
 
 // McpEndpoint names a broker the pod may reach and the scopes authorized for

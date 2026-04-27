@@ -99,6 +99,7 @@ func projectFromConfig(cfg ProjectConfig) *prj.Project {
 		ThreadParent:             cfg.ThreadParent,
 		Capabilities: prj.Capabilities{
 			InjectedCredentials: cfg.Capabilities.InjectedCredentials,
+			HecateCredentials:   cfg.Capabilities.HecateCredentials,
 			McpEndpoints:        cfg.Capabilities.McpEndpoints,
 		},
 	}

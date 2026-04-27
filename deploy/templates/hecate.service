@@ -1,0 +1,22 @@
+[Unit]
+Description=Zakros Hecate credentials broker (Slice H1)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=zakros
+Group=zakros
+ExecStart=/usr/local/bin/hecate \
+  -config /etc/zakros/hecate.json
+Restart=on-failure
+RestartSec=5s
+
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

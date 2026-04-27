@@ -41,5 +41,13 @@ locals {
       disk_size_gb = 50
       ip_offset    = 11
     }
+    openbao = {
+      vm_id        = 214
+      description  = "OpenBao secret store (Slice H1 Hecate backend)"
+      cpu_cores    = 2
+      memory_mb    = 4096
+      disk_size_gb = 50
+      ip_offset    = 14
+    }
   }
 }

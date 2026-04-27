@@ -88,6 +88,31 @@ command -v claude >/dev/null || die "claude (Claude Code CLI) not installed in i
 [[ -n "$ZAKROS_GITHUB_BROKER_URL" ]] || die "ZAKROS_GITHUB_BROKER_URL not set (Slice F: pod must mint installation tokens via the broker)"
 [[ -n "${MCP_AUTH_TOKEN:-}" ]] || die "MCP_AUTH_TOKEN not injected (required to authenticate to the github broker)"
 
+# Slice H1: fetch any HecateCredentials before parsing the envelope.
+# The pod JWT carries credentials.fetch:<ref> scopes; Hecate verifies
+# scope match and returns the value. We export each as the named env
+# var so downstream invocations (claude, gh, custom hooks) see it
+# the same way they saw a Minos-pushed env var pre-Slice-H1.
+if [[ -n "${ZAKROS_HECATE_FETCHES:-}" ]]; then
+  [[ -n "${ZAKROS_HECATE_URL:-}" ]] || die "ZAKROS_HECATE_FETCHES set but ZAKROS_HECATE_URL is empty"
+  log "fetching Hecate-resolved credentials"
+  # ZAKROS_HECATE_FETCHES is a JSON array of {env_var, ref} objects.
+  # Iterate via jq -c so each line is one credential spec.
+  while IFS= read -r spec; do
+    env_var=$(printf '%s' "$spec" | jq -r '.env_var')
+    ref=$(printf '%s' "$spec" | jq -r '.ref')
+    [[ -n "$env_var" && -n "$ref" ]] || die "hecate credential spec missing env_var/ref: $spec"
+    response=$(curl -sS -o /tmp/hecate-fetch -w '%{http_code}' \
+      -H "Authorization: Bearer $MCP_AUTH_TOKEN" \
+      "$ZAKROS_HECATE_URL/credentials/fetch/$ref" || echo "000")
+    [[ "$response" == "200" ]] || die "hecate fetch $ref returned $response: $(cat /tmp/hecate-fetch 2>/dev/null)"
+    val=$(jq -r '.value' /tmp/hecate-fetch)
+    [[ -n "$val" && "$val" != "null" ]] || die "hecate fetch $ref returned empty value"
+    export "$env_var=$val"
+    log "fetched $ref → $env_var"
+  done < <(printf '%s' "$ZAKROS_HECATE_FETCHES" | jq -c '.[]')
+fi
+
 # Parse envelope
 REPO_URL=$(jq -r '.execution.repo_url' "$ZAKROS_ENVELOPE")
 BRANCH=$(jq -r '.execution.branch' "$ZAKROS_ENVELOPE")

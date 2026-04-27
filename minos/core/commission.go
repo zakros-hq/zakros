@@ -217,6 +217,7 @@ func (s *Server) dispatch(ctx context.Context, task *storage.Task) error {
 		WorkspaceSize:     task.Envelope.Execution.WorkspaceSize,
 		MinosURL:          s.cfg.MinosPodURL,
 		GitHubBrokerURL:   s.cfg.GitHubBrokerPodURL,
+		HecateURL:         s.cfg.HecatePodURL,
 		ArgusSidecarImage: s.cfg.Project.ArgusSidecarImage,
 		Resolver:          s.provider,
 	})
@@ -334,6 +335,7 @@ func (s *Server) Respawn(ctx context.Context, taskID uuid.UUID) (*storage.Task, 
 func (s *Server) composeCapabilities(ctx context.Context, taskID uuid.UUID, proj *prj.Project) (envelope.Capabilities, error) {
 	endpoints := append([]envelope.McpEndpoint(nil), proj.Capabilities.McpEndpoints...)
 	injected := append([]envelope.InjectedCredential(nil), proj.Capabilities.InjectedCredentials...)
+	hecateCreds := append([]envelope.HecateCredential(nil), proj.Capabilities.HecateCredentials...)
 
 	// Audience is the union of "minos" (so the pod can post lifecycle
 	// callbacks like PR / memory / narration), "argus" (so the pod
@@ -343,6 +345,17 @@ func (s *Server) composeCapabilities(ctx context.Context, taskID uuid.UUID, proj
 	scopes := map[string][]string{
 		"minos": {"task.lifecycle"},
 		"argus": {"heartbeat"},
+	}
+	// Hecate (Slice H1): one scope per credential the pod is allowed
+	// to fetch. Adds the broker to audience only when the project
+	// has at least one Hecate-resolved credential.
+	if len(hecateCreds) > 0 {
+		audience = append(audience, "hecate")
+		hecateScopes := make([]string, 0, len(hecateCreds))
+		for _, hc := range hecateCreds {
+			hecateScopes = append(hecateScopes, "credentials.fetch:"+hc.Ref)
+		}
+		scopes["hecate"] = hecateScopes
 	}
 	for _, ep := range endpoints {
 		audience = append(audience, ep.Name)
@@ -365,6 +378,7 @@ func (s *Server) composeCapabilities(ctx context.Context, taskID uuid.UUID, proj
 	}
 	return envelope.Capabilities{
 		InjectedCredentials: injected,
+		HecateCredentials:   hecateCreds,
 		McpEndpoints:        endpoints,
 		McpAuthToken:        tok,
 	}, nil

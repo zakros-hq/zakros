@@ -95,6 +95,51 @@ DSN="postgres://zakros:$POSTGRES_PASSWORD@$PG:5432/zakros?sslmode=disable"
 ~/go/bin/goose -dir minos/storage/pgstore/migrations postgres "$DSN" up
 ```
 
+## 1.5. OpenBao LXC (vmid 214) — Slice H1 Hecate backend
+
+```sh
+ssh root@<crete-ip> "pct exec 214 -- bash" < deploy/openbao-bootstrap.sh
+```
+
+This installs OpenBao 2.5.x in the LXC, initializes with a 3-of-5
+unseal quorum, sets up a KV-v2 mount at `secret/`, writes a
+`hecate-app` policy with read access to that mount, and issues a
+1-year token for the Hecate broker.
+
+The init keys + tokens land in `/root/openbao-bootstrap.out` on the
+LXC. **Pull them off and store them somewhere safe — the unseal
+keys are not recoverable.** Then paste the broker token into
+`deploy/secrets.json` under `hecate/vault-token`.
+
+```sh
+ssh root@<crete-ip> "pct exec 214 -- cat /root/openbao-bootstrap.out"
+# → Copy unseal_keys_b64 into your operator-side secret store.
+# → Copy HECATE_VAULT_TOKEN line value into deploy/secrets.json
+#   under "hecate/vault-token".
+```
+
+After every Proxmox restart, OpenBao starts sealed. Manual unseal
+needed (3 of 5 keys):
+
+```sh
+ssh root@<crete-ip> "pct exec 214 -- bao operator unseal <key1>"
+# Repeat with keys 2 and 3.
+```
+
+Auto-unseal via Transit seal is a follow-up; for Slice H1 the
+operator-in-loop unseal is the accepted operational toil.
+
+After bootstrap, seed the existing Claude OAuth token into Vault:
+
+```sh
+CRETE_HOST=<crete-ip> deploy/openbao-seed.sh
+```
+
+This copies `claude-code/oauth-token` from `deploy/secrets.json` into
+`secret/claude-code-token` in OpenBao. After this, the worker pod
+fetches the token from Hecate at startup; the value in
+`deploy/secrets.json` is bootstrap-only and can be cleared.
+
 ## 2. k3s on labyrinth (vmid 212)
 
 ```sh
@@ -241,7 +286,43 @@ The broker listens on `:8082` and the worker pod hits it via
 `ZAKROS_GITHUB_BROKER_URL` (configured in `config.json` →
 `github_broker_pod_url`).
 
-### 7c. argus daemon (Slice J extraction)
+### 7c. hecate broker (Slice H1)
+
+Runs on the Minos VM alongside Minos / github-broker. Fronts OpenBao:
+worker pods (and future brokers) authenticate to Hecate with their
+Minos-minted JWT and fetch credentials by reference; Hecate verifies
+the JWT carries `credentials.fetch:<ref>` scope and reads from Vault
+KV.
+
+```sh
+cp deploy/templates/hecate.json.example deploy/hecate.json
+# Edit deploy/hecate.json:
+#   vault_addr  →  http://<openbao-lxc-ip>:8200
+#   (read the IP from `terraform output -json guests` — currently
+#    no entry for openbao there since LXC IPs aren't always surfaced;
+#    fallback: `ssh root@<crete> "pct exec 214 -- ip -4 addr show eth0"`)
+```
+
+Make sure `deploy/secrets.json` has both:
+- `minos/signing-key-pub` — same key the github-broker uses
+- `hecate/vault-token` — pasted from `/root/openbao-bootstrap.out`
+
+Then:
+
+```sh
+deploy/hecate-install.sh
+
+# tail logs
+ssh zakros@$MINOS 'sudo journalctl -u hecate -f'
+```
+
+Hecate listens on `:8084`. Worker pods inject the URL via
+`ZAKROS_HECATE_URL` (configured in `config.json` →
+`hecate_pod_url`). Claude credential migration: the worker pod's
+`ZAKROS_HECATE_FETCHES` env carries `[{"env_var":"CLAUDE_CODE_OAUTH_TOKEN","ref":"claude-code-token"}]`; the entrypoint fetches at
+startup and exports the env var locally.
+
+### 7d. argus daemon (Slice J extraction)
 
 Runs on the Minos VM alongside Minos and the github-broker. Owns
 the rules engine + heartbeat ingest + push-event ingest as its own

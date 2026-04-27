@@ -40,5 +40,8 @@ docker-compose.override.yaml
 deploy/config.json
 deploy/secrets.json
 deploy/github-broker.json
+deploy/argus.json
+deploy/hecate.json
 /github-broker
 /argus
+/hecate
