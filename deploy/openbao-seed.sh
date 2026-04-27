@@ -36,13 +36,13 @@ declare -a SEEDS=(
   "claude-code/oauth-token:claude-code-token"
 )
 
-# Extract the root token from the LXC's bootstrap output. Operator
-# uses this to write to Vault one-shot — it's not stored anywhere.
-ROOT_TOKEN=$(ssh root@${CRETE_HOST} "pct exec ${OPENBAO_LXC} -- jq -r .root_token /root/openbao-bootstrap.out")
-if [ -z "$ROOT_TOKEN" ] || [ "$ROOT_TOKEN" = "null" ]; then
-  echo "could not read root token from /root/openbao-bootstrap.out on LXC ${OPENBAO_LXC}" >&2
-  exit 1
-fi
+# Operator passes the root token explicitly. Pulling it programmatically
+# via jq broke against the corrupt-from-prior-bootstrap file shape and
+# pretty-printed JSON output; explicit env var sidesteps that whole
+# parsing class. The token is one-shot — Hecate uses its own long-lived
+# hecate-app token at runtime, this is just for the kv-put pass.
+: "${OPENBAO_ROOT_TOKEN:?run: OPENBAO_ROOT_TOKEN=\"\$(ssh root@${CRETE_HOST} pct exec ${OPENBAO_LXC} -- cat /root/openbao-bootstrap.out)\" then extract \"root_token\" value, or copy from openbao-bootstrap.out and pass it on the command line}"
+ROOT_TOKEN="${OPENBAO_ROOT_TOKEN}"
 
 for pair in "${SEEDS[@]}"; do
   fileref="${pair%%:*}"
@@ -58,4 +58,4 @@ done
 
 echo
 echo "==> Done. Verify with:"
-echo "    ssh root@${CRETE_HOST} \"pct exec ${OPENBAO_LXC} -- env BAO_TOKEN='\$(jq -r .root_token /root/openbao-bootstrap.out)' BAO_ADDR=http://127.0.0.1:8200 bao kv list secret/\""
+echo "    ssh root@${CRETE_HOST} \"pct exec ${OPENBAO_LXC} -- env BAO_TOKEN='${ROOT_TOKEN}' BAO_ADDR=http://127.0.0.1:8200 bao kv list secret/\""

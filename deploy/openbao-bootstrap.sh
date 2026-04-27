@@ -28,6 +28,7 @@ OPENBAO_DIR=/etc/openbao
 OPENBAO_DATA=/var/lib/openbao
 OPENBAO_CONFIG="${OPENBAO_DIR}/openbao.hcl"
 OUT_FILE=/root/openbao-bootstrap.out
+HECATE_FILE=/root/openbao-hecate.out
 
 echo "==> apt update + base deps"
 export DEBIAN_FRONTEND=noninteractive
@@ -140,13 +141,16 @@ HECATE_TOKEN_JSON=$(bao token create \
   -format=json)
 HECATE_TOKEN=$(echo "${HECATE_TOKEN_JSON}" | jq -r .auth.client_token)
 
-cat >> "${OUT_FILE}" <<APPEND
-
-# --- Slice H1 Hecate broker token (paste under hecate/vault-token in
-#     deploy/secrets.json) ---
+# Hecate token lands in its own file so OUT_FILE stays parseable JSON
+# (the seed script reads root_token from it).
+cat > "${HECATE_FILE}" <<APPEND
+# Slice H1 Hecate broker token — paste under hecate/vault-token in
+# deploy/secrets.json on your operator workstation.
 HECATE_VAULT_TOKEN=${HECATE_TOKEN}
 APPEND
+chmod 0600 "${HECATE_FILE}"
 
 echo
-echo "==> Done. Read /root/openbao-bootstrap.out for the unseal keys + tokens."
-echo "    DO NOT lose the unseal keys. Without 3-of-5 you can't recover after a restart."
+echo "==> Done."
+echo "    /root/openbao-bootstrap.out  — JSON: unseal_keys_b64 + root_token (DO NOT lose; 3-of-5 quorum)"
+echo "    /root/openbao-hecate.out      — HECATE_VAULT_TOKEN for deploy/secrets.json"
