@@ -38,19 +38,20 @@ if ! command -v bao >/dev/null; then
   echo "==> Installing OpenBao ${OPENBAO_VERSION}"
   ARCH=$(dpkg --print-architecture)
   TMPDEB=/tmp/openbao_${OPENBAO_VERSION}.deb
-  curl -fsSL "https://github.com/openbao/openbao/releases/download/v${OPENBAO_VERSION}/bao_${OPENBAO_VERSION}_linux_${ARCH}.deb" -o "${TMPDEB}"
+  curl -fsSL "https://github.com/openbao/openbao/releases/download/v${OPENBAO_VERSION}/openbao_${OPENBAO_VERSION}_linux_${ARCH}.deb" -o "${TMPDEB}"
   dpkg -i "${TMPDEB}"
   rm -f "${TMPDEB}"
 fi
 
-if ! id openbao >/dev/null 2>&1; then
-  useradd --system --home "${OPENBAO_DATA}" --shell /usr/sbin/nologin openbao
-fi
-install -d -m 0750 -o openbao -g openbao "${OPENBAO_DATA}" "${OPENBAO_DIR}"
+# The .deb ships an `openbao` system user, default config at
+# /etc/openbao/openbao.hcl, and a systemd unit at
+# /usr/lib/systemd/system/openbao.service. We only override the HCL
+# (raft storage, plain HTTP listener, no mlock — Slice H1 single-node
+# posture; TLS lands when an internal CA exists).
+install -d -m 0750 -o openbao -g openbao "${OPENBAO_DATA}"
 
-if [ ! -f "${OPENBAO_CONFIG}" ]; then
-  echo "==> Writing ${OPENBAO_CONFIG}"
-  cat > "${OPENBAO_CONFIG}" <<HCL
+echo "==> Writing ${OPENBAO_CONFIG}"
+cat > "${OPENBAO_CONFIG}" <<HCL
 ui = true
 disable_mlock = true
 
@@ -64,37 +65,11 @@ listener "tcp" {
   tls_disable = 1
 }
 
-api_addr     = "http://0.0.0.0:8200"
-cluster_addr = "http://0.0.0.0:8201"
+api_addr     = "http://127.0.0.1:8200"
+cluster_addr = "http://127.0.0.1:8201"
 HCL
-  chown openbao:openbao "${OPENBAO_CONFIG}"
-  chmod 0640 "${OPENBAO_CONFIG}"
-fi
-
-if [ ! -f /etc/systemd/system/openbao.service ]; then
-  echo "==> Writing openbao.service"
-  cat > /etc/systemd/system/openbao.service <<UNIT
-[Unit]
-Description=OpenBao secret store
-Documentation=https://openbao.org/
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=notify
-User=openbao
-Group=openbao
-ExecStart=/usr/bin/bao server -config=${OPENBAO_CONFIG}
-Restart=on-failure
-RestartSec=5s
-LimitNOFILE=65536
-LimitMEMLOCK=infinity
-
-[Install]
-WantedBy=multi-user.target
-UNIT
-  systemctl daemon-reload
-fi
+chown openbao:openbao "${OPENBAO_CONFIG}"
+chmod 0640 "${OPENBAO_CONFIG}"
 
 systemctl enable openbao
 systemctl restart openbao
