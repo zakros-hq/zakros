@@ -11,6 +11,7 @@
   "github_broker_pod_url": "http://172.16.140.101:8082",
   "argus_url": "http://127.0.0.1:8083",
   "hecate_pod_url": "http://172.16.140.101:8084",
+  "apollo_pod_url": "http://172.16.140.101:8085",
 
   "admins": [
     {
@@ -40,17 +41,20 @@
     "thread_parent": "REPLACE_DISCORD_CHANNEL_ID",
     "capabilities": {
       "injected_credentials": [],
-      "hecate_credentials": [
-        {
-          "env_var": "CLAUDE_CODE_OAUTH_TOKEN",
-          "ref": "claude-code-token"
-        }
-      ],
+      "hecate_credentials": [],
       "mcp_endpoints": [
         {
           "name": "github",
           "url": "http://172.16.140.101:8082",
           "scopes": ["clone"]
+        },
+        {
+          "name": "apollo",
+          "url": "http://172.16.140.101:8085",
+          "scopes": [
+            "apollo.anthropic.claude-sonnet-4-5",
+            "apollo.anthropic.claude-opus-4-5"
+          ]
         }
       ]
     }

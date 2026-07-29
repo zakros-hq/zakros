@@ -15,6 +15,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -27,9 +28,9 @@ import (
 // (`ZAKROS_*`) where they overlap; Iris-specific knobs prefix `IRIS_`.
 type envConfig struct {
 	MinosURL              string
+	ApolloURL             string
 	IrisToken             string
 	AdminToken            string
-	AnthropicKey          string
 	AnthropicModel        string
 	DatabaseURL           string
 	ProjectID             string
@@ -41,20 +42,14 @@ type envConfig struct {
 func loadEnv() (envConfig, error) {
 	c := envConfig{
 		MinosURL:            os.Getenv("ZAKROS_MINOS_URL"),
+		ApolloURL:           os.Getenv("ZAKROS_APOLLO_URL"),
 		IrisToken:           os.Getenv("IRIS_BEARER"),
 		AdminToken:          os.Getenv("IRIS_ADMIN_TOKEN"),
-		AnthropicKey:        os.Getenv("ANTHROPIC_API_KEY"),
 		AnthropicModel:      os.Getenv("IRIS_MODEL"),
 		DatabaseURL:         os.Getenv("IRIS_DATABASE_URL"),
 		ProjectID:           os.Getenv("IRIS_PROJECT_ID"),
 		DefaultRepoURL:      os.Getenv("IRIS_DEFAULT_REPO_URL"),
 		DefaultBranchPrefix: os.Getenv("IRIS_DEFAULT_BRANCH_PREFIX"),
-	}
-	// CLAUDE_CODE_OAUTH_TOKEN is the credential the Phase 1 worker pod
-	// already injects; Iris accepts it as a fallback so operators don't
-	// need a separate Anthropic API key for Slice 0.
-	if c.AnthropicKey == "" {
-		c.AnthropicKey = os.Getenv("CLAUDE_CODE_OAUTH_TOKEN")
 	}
 	if c.AnthropicModel == "" {
 		c.AnthropicModel = "claude-sonnet-4-5"
@@ -67,14 +62,14 @@ func loadEnv() (envConfig, error) {
 	if c.MinosURL == "" {
 		missing = append(missing, "ZAKROS_MINOS_URL")
 	}
+	if c.ApolloURL == "" {
+		missing = append(missing, "ZAKROS_APOLLO_URL")
+	}
 	if c.IrisToken == "" {
 		missing = append(missing, "IRIS_BEARER")
 	}
 	if c.AdminToken == "" {
 		missing = append(missing, "IRIS_ADMIN_TOKEN")
-	}
-	if c.AnthropicKey == "" {
-		missing = append(missing, "ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN")
 	}
 	if c.DatabaseURL == "" {
 		missing = append(missing, "IRIS_DATABASE_URL")
@@ -114,7 +109,12 @@ func main() {
 
 	minosClient := iris.NewMinosClient(cfg.MinosURL, cfg.IrisToken, cfg.AdminToken)
 	hermesClient := iris.NewHermesClient(cfg.MinosURL, cfg.IrisToken)
-	anthropic := iris.NewAnthropicClient(cfg.AnthropicKey, cfg.AnthropicModel)
+	// Slice H2a: route Anthropic traffic through Apollo. Bearer is
+	// Iris's pod JWT (cfg.IrisToken); Apollo strips it, validates the
+	// apollo.anthropic.<model> scope, and forwards to upstream
+	// Anthropic with its own credential.
+	anthropic := iris.NewAnthropicClient(cfg.IrisToken, cfg.AnthropicModel)
+	anthropic.Endpoint = strings.TrimRight(cfg.ApolloURL, "/") + "/v1/messages"
 	convStore := iris.NewConversationStore(pool)
 
 	tools := &iris.ToolSet{

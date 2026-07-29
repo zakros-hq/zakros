@@ -244,18 +244,18 @@ of a long-lived PAT, the pod calls the **github-broker** at startup
 to mint a per-task GitHub App installation token. The PAT is gone
 from the deploy templates entirely.
 
-### 7a. `CLAUDE_CODE_OAUTH_TOKEN`
+### 7a. `anthropic-api-key` (consumed by Apollo, Slice H2a)
 
-Long-lived Claude Code token so pods bill against your Claude.ai
-subscription (Max / Pro / Teams) instead of metered API spend.
-Generate once on your workstation:
+Slice H2a moved every Anthropic call (worker pods + Iris) behind the
+Apollo broker, so neither the worker pod nor Iris carries an Anthropic
+credential anymore. Apollo holds the upstream key, fetched from
+OpenBao at startup. Get a real Anthropic API key from
+https://console.anthropic.com (the Claude Code OAuth token does NOT
+work for the bare Messages API).
 
-```sh
-claude setup-token
-```
-
-Paste the emitted token into `deploy/secrets.json` →
-`claude-code/oauth-token.value`. Token is good for ~1 year.
+Paste the API key into `deploy/secrets.json` →
+`anthropic-api-key.value`. The seed script (§7e) writes it into Vault
+under `secret/anthropic-api-key` so Apollo can fetch it at boot.
 
 ### 7b. github-broker daemon
 
@@ -317,12 +317,72 @@ ssh zakros@$MINOS 'sudo journalctl -u hecate -f'
 ```
 
 Hecate listens on `:8084`. Worker pods inject the URL via
-`ZAKROS_HECATE_URL` (configured in `config.json` →
-`hecate_pod_url`). Claude credential migration: the worker pod's
-`ZAKROS_HECATE_FETCHES` env carries `[{"env_var":"CLAUDE_CODE_OAUTH_TOKEN","ref":"claude-code-token"}]`; the entrypoint fetches at
-startup and exports the env var locally.
+`ZAKROS_HECATE_URL` (configured in `config.json` → `hecate_pod_url`).
 
-### 7d. argus daemon (Slice J extraction)
+Slice H2a removed the worker pod's `ZAKROS_HECATE_FETCHES` for
+`claude-code-token` — Apollo now fronts every Anthropic call, so the
+pod no longer pulls an Anthropic credential of its own. Vault now
+holds `anthropic-api-key` (consumed by Apollo at startup); see §7e.
+
+### 7d. apollo broker (Slice H2a)
+
+Runs on the Minos VM alongside Minos / github-broker / hecate. Fronts
+every upstream LLM provider:
+
+- Worker pods + Iris call `/v1/messages` on Apollo with their own
+  Minos-minted JWT (`Authorization: Bearer <pod-jwt>`).
+- Apollo verifies the JWT (`audience=apollo`, scope
+  `apollo.<provider>.<model>`), strips the bearer, and forwards
+  upstream with its own credential (fetched from Hecate at startup).
+
+The H2a deviation from §2 D4 (subprocess-per-provider) is documented
+in `docs/phase-2-plan.md §9`: in-process Provider interface, single
+binary, one provider compiled in. Subprocess split lands when a
+second provider is integrated.
+
+```sh
+# Mint Apollo's long-lived service JWT (calls Minos /admin/apollo/mint-token)
+MINOS_URL=http://$MINOS:8080 \
+MINOS_ADMIN_TOKEN="$(jq -r '.credentials["minos/admin-token"].value' deploy/secrets.json)" \
+  go run ./cmd/minosctl mint-apollo-token
+
+# Paste the output into deploy/secrets.json under
+# minos/apollo-token.value, then:
+
+cp deploy/templates/apollo.json.example deploy/apollo.json
+# Defaults are correct for the standard layout (Apollo + Hecate
+# co-located on Minos VM, Anthropic upstream). Edit allowed_anthropic_models
+# to extend the model whitelist.
+
+deploy/apollo-install.sh
+ssh zakros@$MINOS 'sudo journalctl -u apollo -f'
+```
+
+Apollo listens on `:8085`. Worker pods inject the URL via
+`ZAKROS_APOLLO_URL` (config.json → `apollo_pod_url`); Iris uses the
+same env. Pod JWTs gain `audience=apollo` + per-model scopes
+automatically when the project's `mcp_endpoints` includes the apollo
+entry (see `deploy/templates/config.json.example`).
+
+### 7e. seed Apollo's upstream credential into Vault
+
+After Hecate is up and Apollo's service JWT is in `secrets.json`,
+seed the Anthropic API key into Vault. `deploy/openbao-seed.sh`
+reads `anthropic-api-key` from `deploy/secrets.json` and writes it
+to `secret/anthropic-api-key` (the path Apollo's
+`anthropic_credential_ref` resolves):
+
+```sh
+OPENBAO_ROOT_TOKEN="<root_token from /root/openbao-bootstrap.out>" \
+  CRETE_HOST=$CRETE \
+  deploy/openbao-seed.sh
+```
+
+After seeding, restart Apollo so it picks up the new credential
+(`apollo-install.sh` does this automatically; if Apollo was already
+running before the seed, `ssh zakros@$MINOS sudo systemctl restart apollo`).
+
+### 7f. argus daemon (Slice J extraction)
 
 Runs on the Minos VM alongside Minos and the github-broker. Owns
 the rules engine + heartbeat ingest + push-event ingest as its own
@@ -355,10 +415,9 @@ Minos and Argus surfaces transitions in both audit streams.
 
 Iris is a long-running pod in labyrinth that long-polls Hermes for
 `@iris` / `/iris` messages, asks Claude what to do, and either answers
-state queries (`what's running?`) or commissions tasks. Phase 1 / Slice
-0 backs it with the Anthropic Messages API directly using the same
-OAuth token the worker pod uses; Phase 2 routes through Apollo, Phase 3
-swaps backend to Athena Ollama.
+state queries (`what's running?`) or commissions tasks. Slice H2a
+routes Anthropic calls through Apollo (Iris no longer holds an
+Anthropic credential); Phase 3 swaps backend to Athena Ollama.
 
 Apply the Deployment after the worker images are loaded (step 3) and
 Minos is running (step 4). Iris's bearer is now a Minos-minted JWT
@@ -387,17 +446,15 @@ The script reads `deploy/config.json` + `deploy/secrets.json`, renders
 - `minos/admin-token` for `POST /tasks` (Iris commissions on the
   operator's behalf — Phase 2 Slice G replaces this with proper
   user-on-behalf-of identity forwarding)
-- `anthropic/api-key` for Claude calls — **must be a real Anthropic
-  API key from https://console.anthropic.com**, NOT the Claude Code
-  OAuth token. The bare Messages API rejects OAuth tokens with
-  "OAuth authentication is currently not supported"; the OAuth flow
-  is specific to the `claude` CLI binary used by the worker pod.
+- `ZAKROS_APOLLO_URL` (rendered from `config.json` →
+  `apollo_pod_url`) for Anthropic calls — Iris speaks the Messages
+  API directly, but Apollo is now the host. Iris uses its own pod JWT
+  as the bearer to Apollo; Apollo strips it, validates the
+  `apollo.anthropic.<model>` scope, and forwards upstream with its
+  own credential.
 
-Add the key to `deploy/secrets.json` under `anthropic/api-key` before
-running `iris-install.sh`. This is a separate billing path from the
-Claude Pro/Max subscription that backs the worker pod's OAuth token —
-Iris's API calls draw from your Anthropic API credit balance. Phase 2
-H2 (Apollo) centralizes this and adds per-project rate limits.
+Slice H2a removed the per-pod Anthropic key; the upstream credential
+lives only in Vault and only Apollo fetches it.
 
 ## 9. End-to-end smoke test
 

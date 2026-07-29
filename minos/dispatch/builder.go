@@ -43,6 +43,14 @@ type BuilderInput struct {
 	// not set.
 	HecateURL string
 
+	// ApolloURL is the pod-reachable URL of cmd/apollo (Slice H2a).
+	// Empty disables the Apollo-routed Anthropic path; the worker
+	// entrypoint then expects the legacy direct-credential path,
+	// which Slice H2 has removed — so empty here in production means
+	// the pod's claude invocation will fail. Kept optional for the
+	// pre-H2 deploy bootstrap order (Apollo lands after the binary).
+	ApolloURL string
+
 	// ArgusSidecarImage, when set, adds the Argus heartbeat sidecar
 	// container to the pod. Empty disables the sidecar (Slice A posture).
 	ArgusSidecarImage string
@@ -107,6 +115,9 @@ func BuildPodSpec(ctx context.Context, in BuilderInput) (PodSpec, error) {
 	}
 	if in.HecateURL != "" {
 		plainEnv["ZAKROS_HECATE_URL"] = in.HecateURL
+	}
+	if in.ApolloURL != "" {
+		plainEnv["ZAKROS_APOLLO_URL"] = in.ApolloURL
 	}
 	// Slice H1: pod-side credential fetch list. Marshalled as JSON
 	// so the entrypoint can decode it without parsing CSV-with-

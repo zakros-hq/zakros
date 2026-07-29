@@ -1,0 +1,13 @@
+{
+  "listen_addr": ":8085",
+  "secrets_file": "/etc/zakros/secrets.json",
+  "signing_key_pub_ref": "minos/signing-key-pub",
+  "hecate_url": "http://127.0.0.1:8084",
+  "apollo_token_ref": "minos/apollo-token",
+  "anthropic_credential_ref": "anthropic-api-key",
+  "anthropic_endpoint": "https://api.anthropic.com",
+  "allowed_anthropic_models": [
+    "claude-sonnet-4-5",
+    "claude-opus-4-5"
+  ]
+}

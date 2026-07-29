@@ -1,0 +1,22 @@
+[Unit]
+Description=Zakros Apollo LLM broker (Slice H2a)
+After=network-online.target hecate.service
+Wants=network-online.target hecate.service
+
+[Service]
+Type=simple
+User=zakros
+Group=zakros
+ExecStart=/usr/local/bin/apollo \
+  -config /etc/zakros/apollo.json
+Restart=on-failure
+RestartSec=5s
+
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

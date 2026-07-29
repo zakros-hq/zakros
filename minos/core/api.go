@@ -51,6 +51,10 @@ func (s *Server) routes() http.Handler {
 	// `minosctl mint-iris-token` once, pastes into deploy/secrets.json
 	// under minos/iris-token, then re-runs deploy/iris-install.sh.
 	mux.Handle("POST /admin/iris/mint-token", s.requireAdmin(http.HandlerFunc(s.handleMintIrisToken)))
+	// Slice H2a: same shape for Apollo's long-lived service JWT — the
+	// credential Apollo presents to Hecate at startup to fetch the
+	// upstream Anthropic API key.
+	mux.Handle("POST /admin/apollo/mint-token", s.requireAdmin(http.HandlerFunc(s.handleMintApolloToken)))
 	mux.HandleFunc("POST /webhooks/github", s.handleGithubWebhook)
 	mux.HandleFunc("POST /webhooks/slack", s.handleSlackWebhook)
 	return s.auditMiddleware(mux)

@@ -59,9 +59,16 @@ Rationale:
 
 The `minos` schema (audit log, identity registry, project registry itself) stays cross-project. Everything keyed on a specific project lives under that project's schema.
 
-### Apollo plugin isolation: strong
+### Apollo plugin isolation: strong (subprocess split deferred to Phase 3)
 
-Per-provider subprocess isolation. One OS subprocess per provider plugin, each holding only its own provider credential resolved from Hecate at subprocess startup. Apollo core fans out over local RPC. This matches the Hermes plugin-subprocess pattern, so one supervisor library serves both (lands in Slice G — see §5).
+Per-provider subprocess isolation is the design target: one OS subprocess per provider plugin, each holding only its own provider credential, Apollo core fanning out over local RPC. This matches the Hermes plugin-subprocess pattern, so one supervisor library serves both (lands in Slice G — see §5).
+
+**Slice H2 deviation (resolved at implementation time):** Phase 2 ships Apollo as a single Go binary with an in-process `Provider` interface and one Anthropic provider compiled in. The subprocess pattern is left as a future-hardening upgrade. Rationale:
+- Phase 2 ships one provider (Anthropic). The blast-radius win from subprocess isolation only manifests when a second provider lands holding a different credential.
+- `pkg/supervisor` doesn't exist yet (Slice G deferred it). Building it just for Apollo's single-provider posture trades real complexity for theoretical isolation.
+- The `Provider` interface is shaped for an HTTP-RPC subprocess variant; promoting an in-process plugin to a subprocess is a contained refactor, not a redesign.
+
+The acceptance bullet "synthetic second-provider plugin loads" is satisfied by registering a stub `Provider` at startup — the test exercises Apollo's routing and JWT-scope enforcement, which is the load-bearing property. Subprocess isolation upgrades when a real second provider lands or when Slice K's trust-boundary work requires it.
 
 ### System identity authentication: two credentials
 
@@ -269,6 +276,7 @@ Phase 1 acceptance is now fully closed, with the backend-is-Claude interim expli
    - Postgres `minos.projects` table with fields per `architecture.md §6 Project Registry` Phase 1 schema (id, name, GitHub app refs, communication refs, task_types_allowed, workspace_defaults, resource_limits, `branch_protection_required`, `mnemosyne.retention_days`)
    - `ProjectConfig` singleton code path deleted; `project_id` carried on every task envelope
    - Single-project deployments are the degenerate case (one registry row)
+   - **Multi-installation github-broker** (carve-out from H2a operational findings): the GitHub App can be installed on multiple accounts/orgs (e.g. `zakros-hq` plus the operator's personal account), each with its own `installation_id`. The Phase 1 / H2a broker hardcodes one ID in `deploy/github-broker.json`. Slice G replaces this with a per-project `github_installation_id` field on the project row. The broker takes `project_id` (or resolves owner→install via a fallback map) on each `installation-token` mint and selects the right install. Project rows pointing at repos under different App installs become first-class.
 
 6. **Schema-per-project Postgres work.**
    - DB provisioning on project creation: `CREATE SCHEMA minos_<project_id>`, `CREATE SCHEMA mnemosyne_<project_id>`
@@ -447,6 +455,15 @@ Phase 1 acceptance is now fully closed, with the backend-is-Claude interim expli
 6. **Second-provider structural readiness.**
    - Provider plugin interface shaped for OpenAI/Google/etc. plugins to land without core changes
    - Phase 2 ships Anthropic only; a second plugin is the `roadmap.md §Phase 2 acceptance` bullet 2 trigger and lands opportunistically
+
+### H2a vs H2b split (resolved at implementation time)
+
+Slice H2 ships in two passes:
+
+- **H2a (this slice):** Apollo binary, JWT-gated `/v1/messages`, transparent Anthropic proxy, Hecate-fetched upstream credential, Iris + claude-code worker pod migrated. Usage logged to Clio for visibility but no enforcement; per-provider stub for the second-provider acceptance test. The credential-isolation win lands here — no pod holds the Anthropic credential.
+- **H2b (follow-up):** Per-project rate limits in a new `apollo` Postgres schema (rolling-window counters per `architecture.md §6`), non-forgeable usage events pushed to `/argus/events`, runaway-loop termination via Argus rules. This is what closes Phase 2 acceptance bullet 2's cost-enforcement portion and `security.md §13`.
+
+The H2b work depends on the rate-limit schema + Argus push integration that Slice J wired but doesn't currently exercise from broker callers. H2b lands before Slice K so K's confirmation-token primitive can fire on cap-breach scenarios.
 
 ### Acceptance checkpoint for Slice H2
 

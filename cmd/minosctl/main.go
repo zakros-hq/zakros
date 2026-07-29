@@ -40,6 +40,7 @@ func main() {
 	root.AddCommand(getCmd())
 	root.AddCommand(genSigningKeyCmd())
 	root.AddCommand(mintIrisTokenCmd())
+	root.AddCommand(mintApolloTokenCmd())
 
 	if err := root.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)
@@ -173,6 +174,33 @@ func mintIrisTokenCmd() *cobra.Command {
 		Short: "Mint Iris's long-lived bearer JWT (calls Minos /admin/iris/mint-token)",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			data, err := do(cmd.Context(), "POST", "/admin/iris/mint-token", nil)
+			if err != nil {
+				return err
+			}
+			var resp struct {
+				Token string `json:"token"`
+			}
+			if err := json.Unmarshal(data, &resp); err != nil {
+				return fmt.Errorf("parse response: %w", err)
+			}
+			if resp.Token == "" {
+				return errors.New("minos returned empty token")
+			}
+			fmt.Fprintln(cmd.OutOrStdout(), resp.Token)
+			return nil
+		},
+	}
+}
+
+// mintApolloTokenCmd asks Minos to mint Apollo's long-lived service JWT.
+// Same shape as mint-iris-token; the operator pastes the result into
+// deploy/secrets.json under minos/apollo-token and re-runs apollo-install.
+func mintApolloTokenCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "mint-apollo-token",
+		Short: "Mint Apollo's long-lived service JWT (calls Minos /admin/apollo/mint-token)",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			data, err := do(cmd.Context(), "POST", "/admin/apollo/mint-token", nil)
 			if err != nil {
 				return err
 			}

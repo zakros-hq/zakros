@@ -42,6 +42,12 @@ type Config struct {
 	// http://172.16.140.101:8084 when Hecate is co-located with
 	// Minos on the Minos VM (current Slice H1 deploy shape).
 	HecatePodURL string `json:"hecate_pod_url"`
+	// ApolloPodURL is the Apollo broker URL as seen from inside a
+	// Labyrinth pod (Slice H2a). Injected as ZAKROS_APOLLO_URL so the
+	// entrypoint can route Anthropic Messages API calls through
+	// Apollo. Default: http://172.16.140.101:8085 when Apollo is
+	// co-located with Minos on the Minos VM.
+	ApolloPodURL string `json:"apollo_pod_url"`
 	// ArgusURL is the Argus binary's HTTP base URL on the Minos VM
 	// (Slice J extraction). Used by Minos's mutual health monitor —
 	// empty disables the cross-monitor goroutine.

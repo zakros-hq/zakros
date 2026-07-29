@@ -42,6 +42,9 @@ deploy/secrets.json
 deploy/github-broker.json
 deploy/argus.json
 deploy/hecate.json
+deploy/apollo.json
+.infisical.json
 /github-broker
 /argus
 /hecate
+/apollo

@@ -5,8 +5,12 @@
 # the corresponding entries from deploy/secrets.json (their values
 # only existed there for bootstrap, not runtime).
 #
-# Slice H1 default mapping:
-#   claude-code/oauth-token  →  secret/data/claude-code-token
+# Slice H2a default mapping:
+#   anthropic-api-key  →  secret/data/anthropic-api-key
+#
+# (H1 used claude-code/oauth-token → secret/data/claude-code-token; H2a
+# replaces it because the worker pod no longer holds an Anthropic
+# credential — Apollo fronts every Anthropic call.)
 #
 # Run from the operator's workstation. Requires OPENBAO_LXC env var
 # pointing at the LXC's vmid (default 214). The script copies values
@@ -33,7 +37,7 @@ get() {
 
 # Pull each (file-ref, vault-ref) pair from secrets.json.
 declare -a SEEDS=(
-  "claude-code/oauth-token:claude-code-token"
+  "anthropic-api-key:anthropic-api-key"
 )
 
 # Operator passes the root token explicitly. Pulling it programmatically

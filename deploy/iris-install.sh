@@ -41,19 +41,15 @@ fi
 # admin token (Phase 1 single-admin posture: Iris commissions on the
 # operator's behalf).
 #
-# Iris requires a real Anthropic API key, NOT the Claude Code OAuth
-# token: bare /v1/messages calls reject OAuth with
-#   "OAuth authentication is currently not supported"
-# The OAuth token works with the `claude` CLI specifically (which the
-# worker pod uses); Iris speaks the Messages API directly. Phase 2 H2
-# routes through Apollo — same constraint, different hop.
+# Slice H2a: Iris no longer needs the Anthropic API key directly —
+# Apollo holds it. Iris speaks the Anthropic Messages API at
+# $ZAKROS_APOLLO_URL/v1/messages with its own pod JWT as the bearer.
 get_secret() {
   jq -r --arg k "$1" '.credentials[$k].value // empty' deploy/secrets.json
 }
 
 IRIS_BEARER=$(get_secret "minos/iris-token")
 IRIS_ADMIN_TOKEN=$(get_secret "minos/admin-token")
-ANTHROPIC_KEY=$(get_secret "anthropic/api-key")
 
 if [ -z "$IRIS_BEARER" ]; then
   echo "secrets.json missing minos/iris-token" >&2
@@ -63,24 +59,17 @@ if [ -z "$IRIS_ADMIN_TOKEN" ]; then
   echo "secrets.json missing minos/admin-token" >&2
   exit 1
 fi
-if [ -z "$ANTHROPIC_KEY" ]; then
-  cat >&2 <<'MSG'
-secrets.json missing anthropic/api-key.
-
-Iris needs a real Anthropic API key (from https://console.anthropic.com).
-The Claude Code OAuth token used by the worker pod does NOT work for
-this — Anthropic's Messages API rejects OAuth tokens directly with
-'OAuth authentication is currently not supported'.
-
-Add the key to deploy/secrets.json under anthropic/api-key and re-run.
-MSG
-  exit 1
-fi
 
 DATABASE_URL=$(jq -r '.database_url' deploy/config.json)
 MINOS_URL=$(jq -r '.minos_pod_url' deploy/config.json)
+APOLLO_URL=$(jq -r '.apollo_pod_url' deploy/config.json)
 PROJECT_ID=$(jq -r '.project.id' deploy/config.json)
 DEFAULT_REPO=$(jq -r '.project.default_repo_url // ""' deploy/config.json)
+
+if [ -z "$APOLLO_URL" ] || [ "$APOLLO_URL" = "null" ]; then
+  echo "config.json missing apollo_pod_url (Slice H2a: Iris must route through Apollo)" >&2
+  exit 1
+fi
 
 if [ -z "$DATABASE_URL" ] || [ "$DATABASE_URL" = "null" ]; then
   echo "config.json missing database_url" >&2
@@ -93,9 +82,9 @@ trap 'rm -f "$TMP"' EXIT
 sed \
   -e "s|REPLACE_IRIS_BEARER|${IRIS_BEARER}|g" \
   -e "s|REPLACE_IRIS_ADMIN_TOKEN|${IRIS_ADMIN_TOKEN}|g" \
-  -e "s|REPLACE_ANTHROPIC_KEY|${ANTHROPIC_KEY}|g" \
   -e "s|REPLACE_DATABASE_URL|${DATABASE_URL}|g" \
   -e "s|REPLACE_MINOS_URL|${MINOS_URL}|g" \
+  -e "s|REPLACE_APOLLO_URL|${APOLLO_URL}|g" \
   -e "s|REPLACE_PROJECT_ID|${PROJECT_ID}|g" \
   -e "s|REPLACE_DEFAULT_REPO_URL|${DEFAULT_REPO}|g" \
   -e "s|zakros/iris:local|zakros/iris:${IMAGE_TAG}|g" \

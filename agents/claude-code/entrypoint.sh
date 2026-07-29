@@ -19,6 +19,7 @@ set -euo pipefail
 : "${WORKSPACE:=/workspace}"
 : "${ZAKROS_MINOS_URL:=}"
 : "${ZAKROS_GITHUB_BROKER_URL:=}"
+: "${ZAKROS_APOLLO_URL:=}"
 
 log()  { printf '[%s] %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"; }
 die()  { log "ERROR: $*"; post_status "status" "error: $*" "" || true; flush_memory "failed" "$*"; exit 1; }
@@ -120,6 +121,18 @@ BASE_BRANCH=$(jq -r '.execution.base_branch' "$ZAKROS_ENVELOPE")
 BRIEF_SUMMARY=$(jq -r '.brief.summary' "$ZAKROS_ENVELOPE")
 BRIEF_DETAIL=$(jq -r '.brief.detail // ""' "$ZAKROS_ENVELOPE")
 PROJECT_ID=$(jq -r '.project_id' "$ZAKROS_ENVELOPE")
+
+# Slice H2a: route the claude CLI's Anthropic calls through Apollo.
+# The CLI honors ANTHROPIC_BASE_URL for the API host and
+# CLAUDE_CODE_OAUTH_TOKEN for the bearer-auth header. We set the bearer
+# to the pod JWT (MCP_AUTH_TOKEN); Apollo verifies the JWT, strips it,
+# and forwards to upstream Anthropic with its own x-api-key. This
+# replaces the H1 Hecate-fetched claude-code-token path; the credential
+# itself never lands in this pod's env.
+[[ -n "$ZAKROS_APOLLO_URL" ]] || die "ZAKROS_APOLLO_URL not set (Slice H2a: pod must route Anthropic calls through Apollo)"
+export ANTHROPIC_BASE_URL="$ZAKROS_APOLLO_URL"
+export CLAUDE_CODE_OAUTH_TOKEN="$MCP_AUTH_TOKEN"
+log "anthropic traffic routed through Apollo: $ZAKROS_APOLLO_URL"
 
 # Mint a GitHub App installation access token from the broker. The pod
 # JWT (MCP_AUTH_TOKEN) carries audience=github + scope=clone; the

@@ -11,26 +11,36 @@ import (
 )
 
 // AnthropicClient is a minimal client for Anthropic's Messages API, just
-// enough for Iris's tool-use loop. Phase 2 Slice H2 routes this traffic
-// through Apollo (same Messages API shape on Apollo's frontend), at
-// which point the Endpoint changes and the auth header carries a
-// Minos-minted JWT instead of a bearer credential.
+// enough for Iris's tool-use loop. Slice H2a routes traffic through
+// Apollo: Endpoint points at Apollo's `/v1/messages` URL, AuthBearer is
+// Iris's Minos-minted JWT (not the upstream Anthropic key). Apollo
+// strips the bearer, validates the JWT against `apollo.anthropic.<model>`
+// scope, and forwards to upstream Anthropic with its own x-api-key.
 type AnthropicClient struct {
-	Endpoint string // default "https://api.anthropic.com/v1/messages"
-	APIKey   string // OAuth token or API key — sent as Authorization: Bearer
-	Model    string // e.g. "claude-sonnet-4-5"
-	Version  string // anthropic-version header, e.g. "2023-06-01"
+	// Endpoint is the full URL Iris POSTs to. Slice H2a default:
+	// $ZAKROS_APOLLO_URL/v1/messages. Pre-Apollo deploys point this
+	// at https://api.anthropic.com/v1/messages directly.
+	Endpoint string
 
+	// AuthBearer is the value sent in `Authorization: Bearer <token>`.
+	// Slice H2a: Iris's Minos-minted JWT carrying audience=apollo +
+	// apollo.anthropic.<model> scopes. Pre-Apollo: an Anthropic API
+	// key — see legacy comment below.
+	AuthBearer string
+
+	Model      string // e.g. "claude-sonnet-4-5"
+	Version    string // anthropic-version header, e.g. "2023-06-01"
 	HTTPClient *http.Client
 }
 
 // NewAnthropicClient defaults Endpoint and Version. Caller supplies the
-// API key (CLAUDE_CODE_OAUTH_TOKEN works for the Messages API) and the
-// model name.
-func NewAnthropicClient(apiKey, model string) *AnthropicClient {
+// auth bearer (Iris's pod JWT under the H2a path) and the model name.
+// Endpoint must be set via the returned struct's field — main.go reads
+// ZAKROS_APOLLO_URL and composes `${url}/v1/messages`.
+func NewAnthropicClient(authBearer, model string) *AnthropicClient {
 	return &AnthropicClient{
 		Endpoint:   "https://api.anthropic.com/v1/messages",
-		APIKey:     apiKey,
+		AuthBearer: authBearer,
 		Model:      model,
 		Version:    "2023-06-01",
 		HTTPClient: &http.Client{Timeout: 120 * time.Second},
@@ -105,11 +115,10 @@ func (a *AnthropicClient) Create(ctx context.Context, req CreateRequest) (*Creat
 	if err != nil {
 		return nil, err
 	}
-	// Anthropic auth: API keys use x-api-key. The Authorization: Bearer
-	// header is the OAuth path, which the bare Messages API rejects with
-	// "OAuth authentication is currently not supported" — so use x-api-key
-	// unambiguously here.
-	httpReq.Header.Set("x-api-key", a.APIKey)
+	// Slice H2a: Authorization: Bearer carries Iris's pod JWT to
+	// Apollo. Apollo terminates the bearer, validates audience+scope,
+	// and forwards to upstream Anthropic with its own x-api-key.
+	httpReq.Header.Set("Authorization", "Bearer "+a.AuthBearer)
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("anthropic-version", a.Version)
 	resp, err := a.HTTPClient.Do(httpReq)

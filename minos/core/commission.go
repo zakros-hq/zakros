@@ -218,6 +218,7 @@ func (s *Server) dispatch(ctx context.Context, task *storage.Task) error {
 		MinosURL:          s.cfg.MinosPodURL,
 		GitHubBrokerURL:   s.cfg.GitHubBrokerPodURL,
 		HecateURL:         s.cfg.HecatePodURL,
+		ApolloURL:         s.cfg.ApolloPodURL,
 		ArgusSidecarImage: s.cfg.Project.ArgusSidecarImage,
 		Resolver:          s.provider,
 	})
