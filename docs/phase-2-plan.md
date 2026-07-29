@@ -12,6 +12,20 @@ Phase 2 is the broker-extraction and hardening phase. Phase 1 shipped the minimu
 
 The planning method is the same as Phase 1: slice-by-acceptance. Each slice closes at least one bullet of the Phase 2 acceptance gate, and no slice lands without its acceptance checkpoint passing on the real Crete deployment.
 
+## Slice status (2026-07-28)
+
+| Slice | Status |
+|---|---|
+| 0 (Iris closes Phase 1 gate) | Shipped |
+| F (Ed25519 JWT + github-broker) | Committed (`80dd241`) |
+| G (identity + project registries) | Committed (`aa401e4`) |
+| J (Argus extraction + Cerberus verifiers) | Committed (`f8d5912`) |
+| H1 (Hecate on OpenBao) | Committed (`b60ba18` + fixes) |
+| H2a (Apollo broker, transparent proxy) | **Committed (`e435cf0`, 2026-07-28)** — build/vet/test green; Crete acceptance smoke still pending |
+| H2b, I, K, L1–L5, M | Not started |
+
+H2b scope note (from `field-delta-2026-07-28.md §4`): Apollo owns **external-provider** accounting only. Local-Athena budgets are enforced server-side by Athena itself (its ADR 041 — per-principal rolling budgets, 429 on breach); H2b integrates with that (read `/api/usage`, honour the 429) rather than rebuilding it.
+
 ---
 
 ## 1. Phase 2 Acceptance Gate
@@ -767,7 +781,7 @@ These are parallel because they touch non-overlapping pod images, MCP scopes, an
 
 ### CI
 
-- Phase 1 workflow (`go vet`, `go test ./...`, `golangci-lint`, `go build ./...`, per-module Dockerfile builds) extends to cover new cmd/ binaries (`cmd/argus`, `cmd/hecate`, `cmd/apollo`) and new agent images (Themis, Momus, Calliope, Prometheus, Hephaestus)
+- **No CI exists yet** (2026-07-28) — the "Phase 1 workflow" earlier drafts referenced was never built; the command set lives in the Makefile only. Standing up a workflow (`go vet`, `go test ./...`, `golangci-lint`, `go build ./...`, per-module Dockerfile builds) covering all cmd/ binaries and agent images is open standards debt (`priorities-2026-07-28.md`)
 - Slack verifier plugin contract gains a fixture-based test suite
 - JWT middleware gains a property-based test suite covering claim parsing, scope matching, signature verification
 
