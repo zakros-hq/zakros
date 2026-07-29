@@ -12,7 +12,7 @@ Phase 2 is the broker-extraction and hardening phase. Phase 1 shipped the minimu
 
 The planning method is the same as Phase 1: slice-by-acceptance. Each slice closes at least one bullet of the Phase 2 acceptance gate, and no slice lands without its acceptance checkpoint passing on the real Crete deployment.
 
-## Slice status (2026-07-28)
+## Slice status (2026-07-29, per ADR 0003)
 
 | Slice | Status |
 |---|---|
@@ -21,8 +21,12 @@ The planning method is the same as Phase 1: slice-by-acceptance. Each slice clos
 | G (identity + project registries) | Committed (`aa401e4`) |
 | J (Argus extraction + Cerberus verifiers) | Committed (`f8d5912`) |
 | H1 (Hecate on OpenBao) | Committed (`b60ba18` + fixes) |
-| H2a (Apollo broker, transparent proxy) | **Committed (`e435cf0`, 2026-07-28)** — build/vet/test green; Crete acceptance smoke still pending |
-| H2b, I, K, L1–L5, M | Not started |
+| H2a (Apollo broker, transparent proxy) | Committed (`e435cf0`) — build/vet/test green; **Crete acceptance smoke blocked (Crete offline, homelab remodel)** |
+| **Committed core: H2b → K → L1 → L2** | Not started — this is the whole remaining commitment |
+| I | Split: Hermes subprocess extraction may pull forward on its own; Slack plugin is a trigger-attached option |
+| L3 (Calliope), L4 (Prometheus), L5 (Hephaestus), M (admin UI + break-glass + Proxmox broker) | **Trigger-attached options** — not committed; triggers named in `roadmap.md §Phase 2` and ADR 0003 |
+
+All acceptance checkpoints requiring the Crete deployment are blocked (not waived) until the homelab remodel completes; code-complete slices hold at "committed, not accepted."
 
 H2b scope note (from `field-delta-2026-07-28.md §4`): Apollo owns **external-provider** accounting only. Local-Athena budgets are enforced server-side by Athena itself (its ADR 041 — per-principal rolling budgets, 429 on breach); H2b integrates with that (read `/api/usage`, honour the 429) rather than rebuilding it.
 
@@ -115,7 +119,9 @@ Per `memory/hermes_identity_abstraction.md`, the Phase 1 Discord bot (registered
 ### Build order and dependencies
 
 ```
- 0 (optional) → F ‖ G → J → (H1 ‖ H2 ‖ I) → K → L1 → (L2 ‖ L3 ‖ L4 ‖ L5) → M
+ committed (ADR 0003):  0 → F ‖ G → J → (H1 ‖ H2a) → H2b → K → L1 → L2
+ options (on trigger):  I-slack, L3, L4, L5, M
+ pull-forward eligible: I-hermes-extraction (when subprocess credential isolation matters)
 ```
 
 - **Slice 0** closes the Phase 1 Iris acceptance bullet that slipped. Optional on whether you want it done before Phase 2 structural work; recommended.
@@ -494,7 +500,9 @@ The H2b work depends on the rate-limit schema + Argus push integration that Slic
 
 ---
 
-## 10. Slice I — "Hermes extraction + multi-identity + Slack plugin" *(parallel with H1, H2; after J)*
+## 10. Slice I — "Hermes extraction + multi-identity + Slack plugin" *(split per ADR 0003)*
+
+> **Status note (2026-07-29):** the Hermes subprocess-extraction + multi-identity half is pull-forward eligible (build when subprocess credential isolation matters); the Slack-plugin half is a **trigger-attached option** — trigger: a second surface actually needed. Section preserved as written for whichever half activates.
 
 **Proves:** Hermes plugins run as supervised subprocesses with per-plugin credential isolation; Iris/Minos/Asclepius render as distinct speakers on every surface; Slack works alongside Discord; messages missed during Minos downtime are replayed to operators.
 
@@ -651,7 +659,9 @@ The H2b work depends on the rate-limit schema + Argus push integration that Slic
 
 ---
 
-## 13. Slices L2–L5 — "Momus, Calliope, Prometheus, Hephaestus" *(parallel, after L1)*
+## 13. Slices L2–L5 — "Momus, Calliope, Prometheus, Hephaestus" *(L2 committed; L3–L5 options per ADR 0003)*
+
+> **Status note (2026-07-29):** **L2 Momus is committed core** (its trigger — PR review as table stakes, and dogfooding Zakros's own PRs — has fired). **L3 Calliope, L4 Prometheus, L5 Hephaestus are trigger-attached options**; triggers named in `roadmap.md §Phase 2 Pod-class expansion`. Sections preserved as written for when a trigger fires.
 
 **Proves:** pod-class expansion that turns Zakros from "one agent per task" into "coordinated team." All four pod classes commission through Themis (or directly through Minos for scheduled/triggered flows) and run under Phase 2's trust-boundary + confirmation-token infrastructure.
 
@@ -707,7 +717,9 @@ These are parallel because they touch non-overlapping pod images, MCP scopes, an
 
 ---
 
-## 14. Slice M — "Break-glass + admin UI + Iris P2 + Proxmox + infra tasks" *(after L)*
+## 14. Slice M — "Break-glass + admin UI + Iris P2 + Proxmox + infra tasks" *(trigger-attached option per ADR 0003)*
+
+> **Status note (2026-07-29):** not committed. Triggers: admin UI + break-glass — a second operator or identity-registry growth beyond one row; Proxmox broker + `infra` task type — a real infra-task demand. Iris P2 conversational additions ride whichever piece activates first.
 
 **Proves:** operator can inspect misbehaving pods via Minos-brokered short-lived sessions; admin UI exposes the identity registry; Iris's conversational surface grows to match Minos's admin API; infra tasks (Proxmox/Terraform) commission through Minos with a dedicated broker. Closes the final Phase 2 acceptance gate bullets.
 

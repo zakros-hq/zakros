@@ -108,16 +108,18 @@ The [full roadmap](docs/roadmap.md) is the authoritative source; this is the sha
 
 ### Phase 2 — Broker layer + pod-class expansion + hardening
 
-Planned. Full slice decomposition in [`docs/phase-2-plan.md`](docs/phase-2-plan.md); the shape at a glance:
+In progress. Full slice decomposition in [`docs/phase-2-plan.md`](docs/phase-2-plan.md); scope per [ADR 0003](docs/decisions/0003-phase-2-tail-is-re-derived-from-roadmap-triggers.md):
 
-- **Slice 0** — close the Phase 1 Iris acceptance bullet (Iris-as-pod, NL commission + state query; Claude-backed interim until Athena is stood up)
-- **Slices F ‖ G** — Ed25519 JWT foundation + github-mcp-server shim (F), identity registry + project registry + shared plugin supervisor (G). Replaces HMAC bearers, `AdminIdentity` scalar, `ProjectConfig` singleton, and the lingering GitHub PAT
-- **Slice J** — extract Argus into its own service with JWT-verified push-event ingest; add Cerberus verifier plugins (GitHub HMAC + Slack signing, library stays in-process)
-- **Slices H1 ‖ H2 ‖ I** — Hecate credentials broker on OpenBao (H1), Apollo external-LLM broker with non-forgeable usage tracking (H2), Hermes subprocess extraction + multi-identity (webhook-based per-message `username`/avatar override) + Slack plugin (I)
-- **Slice K** — trust-boundary primitive in the worker plugin interface, high-blast confirmation tokens bound to operation content, Mnemosyne untrusted-source tagging preserved across context injection
+**Landed** — Slice 0 (Iris pod), F (Ed25519 JWTs + github-broker; replaced HMAC bearers and the PAT), G (identity + project registries), J (Argus extraction + Cerberus verifier plugins), H1 (Hecate on OpenBao), H2a (Apollo transparent Anthropic proxy — no pod holds the provider credential).
+
+**Committed core, in order:**
+
+- **H2b** — Apollo enforcement: per-project rate limits, non-forgeable usage events to Argus, runaway termination
+- **Slice K** — trust-boundary primitive, high-blast confirmation tokens bound to operation content, Mnemosyne untrusted-source tagging
 - **Slice L1** — Themis project-management pod; backlog decomposition and Argus escalation routing
-- **Slices L2–L5** — Momus (PR review), Calliope (`docs/**` scoped), Prometheus (release, prod promotion gated on confirmation), Hephaestus (draft ADRs only)
-- **Slice M** — break-glass session minting, minimal admin UI, Iris Phase 2 additions (pairing approval, delegated actions), Proxmox MCP broker + `infra` task type
+- **Slice L2** — Momus PR-review pod (comment-only scope), reviewing Zakros's own PRs first
+
+**Trigger-attached options** (built when their trigger fires, not before): Calliope, Prometheus, Hephaestus pods; the Slack plugin; admin UI + break-glass minting; Proxmox broker + `infra` tasks. Triggers are named in the roadmap and phase-2 plan.
 
 Teams plugin, Athena dev sandboxes, Pythia research pods, and Asclepius health monitoring are Phase 3.
 

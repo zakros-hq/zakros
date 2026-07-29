@@ -101,25 +101,30 @@ Goal: extract the broker fleet, add the pod classes that turn Zakros from "one a
 - **Apollo** — external LLM broker with per-provider plugins, non-forgeable usage tracking, per-project rate limits, audit to Clio, subprocess isolation per provider
 - **Proxmox MCP broker** — lands alongside the `infra` task type. Design first checks whether an existing community Proxmox MCP meets the Zakros broker contract (JWT auth, scope enforcement, Clio audit); only written in-house if no fit. Enables the `task.commission.infra` capability and Minos's per-project Proxmox token injection (`architecture.md §6` Other credentials).
 - **Hecate** — credentials broker, fronts the secret provider, enforces Minos-set per-credential ACLs on JWT-authenticated fetches from pods and Minos-VM broker subprocesses. Required for in-pod credential refresh (tasks that outlive the GitHub App installation token's 1-hour TTL) and for cleanly serving credentials to the newly-extracted plugin subprocesses of Hermes/Cerberus/Apollo. Depends on JWT MCP broker auth (below) — shipping Hecate under Phase 1's bearer-token check would make the system's highest-value target the weakest-authenticated.
-- **Hermes** grows subprocess isolation, additional surface plugins, credential rotation via SIGHUP, and inbound-message replay on Minos recovery (timestamped stream delivered to affected pods so agents can decide whether to re-plan or `request_human_input`)
+- **Hermes** grows subprocess isolation, additional surface plugins, credential rotation via SIGHUP, and inbound-message replay on Minos recovery (timestamped stream delivered to affected pods so agents can decide whether to re-plan or `request_human_input`). *ADR 0003: the subprocess-isolation half may be pulled forward on its own; the Slack/second-surface half is a trigger-attached option (trigger: a second surface actually needed).*
 - **Cerberus** becomes a standalone broker with pluggable ingress + verification plugin layers
 - **Argus** extracts from Minos into its own service with push-event ingest (signed audit events from every broker), drift detection deferred to Phase 3
 
 ### Pod-class expansion
 
+Committed ([ADR 0003](decisions/0003-phase-2-tail-is-re-derived-from-roadmap-triggers.md)):
+
 - **Themis** — project management pod. Owns the backlog, decomposes epics into `task_type` envelopes per `architecture.md §8`, commissions work through Minos, and serves as the default routing point for Argus escalations. Does not replace Minos's control-plane role. Long-lived pod, same lifecycle shape as Iris.
-- **Momus** — code review pod. Runs on every Zakros-opened PR as automated triage before human review. Two-stage: local tier (`qwen2.5-coder:32b` on Athena) full sweep on every PR, Apollo escalation for high-confidence findings and architectural drift. Expected 60–70% reduction in Claude calls per PR versus routing every review through Apollo. Comment-only GitHub scope; no approve / request-changes / merge.
-- **Calliope** — documentation pod. Generates READMEs, API docs, changelogs, and ADR formatting. `docs/**`-scoped GitHub App token; cannot mutate application code. Reactive mode (per merged PR) and scheduled rollup (drift reconciliation).
-- **Prometheus** — DevOps / release pod. Owns pipeline config, version bumping, artifact publication, and environment promotion. Production promotion is a high-blast scope requiring an operator confirmation token.
-- **Hephaestus** — architectural assistant. Drafts ADRs and surfaces coupling / topology concerns; produces draft artifacts only (`docs/adr/proposed/**`, `docs/reports/**`). Promotion to `docs/adr/accepted/**` is human-only. Claude-tier by default (Sonnet; Opus on operator request for genuinely ambiguous structural decisions).
+- **Momus** — code review pod. Runs on every Zakros-opened PR as automated triage before human review. Two-stage: local tier on Athena full sweep on every PR, Apollo escalation for high-confidence findings and architectural drift. Expected 60–70% reduction in Claude calls per PR versus routing every review through Apollo. Comment-only GitHub scope; no approve / request-changes / merge.
+
+Trigger-attached options (built when the named trigger fires, not before):
+
+- **Calliope** — documentation pod (`docs/**`-scoped writes, reactive + scheduled rollup). *Trigger: doc drift recurring faster than the operator corrects it, or a real `docs` task-type demand.*
+- **Prometheus** — DevOps / release pod (versioning, artifact publication, promotion behind confirmation tokens). *Trigger: release cadence outgrows the manual `/ship` ritual.*
+- **Hephaestus** — architectural assistant (draft ADRs only, `docs/adr/proposed/**`). *Trigger: ADR backlog demonstrably outpacing operator authoring.*
 
 ### Hardening
 
 - **JWT MCP broker authentication** — Minos signs per-pod tokens (Ed25519), brokers verify with public key, scopes enforced per call, audit to Clio
 - **Trust boundary contract** codified in the worker backend plugin interface — trusted/untrusted framing primitives the plugin surfaces to its LLM
 - **High-blast confirmation tokens** — scope-marked operations require human approval via the task thread before execution; confirmation bound to operation content (not just scope name)
-- **Pairing flow + identity registry** — `(surface, surface_id)` identities, role bundles (`admin`, `commissioner`, `observer`, `system` — the last for internal pods that commission autonomously; see `architecture.md §11 Authority Model`), `/pair` approval flow (human roles only; `system` bypasses pairing), revocation with last-admin protection (human roles only — `system` has no last-identity protection), bootstrap from config for human admins and from the `system_identities` block in `deploy/config.json` for `system` identities
-- **Break-glass session minting** — `break_glass.observe` and `break_glass.shell` capabilities, short-lived k3s ServiceAccount tokens, k3s audit log shipped to Clio
+- **Pairing flow + identity registry** — `(surface, surface_id)` identities, role bundles (`admin`, `commissioner`, `observer`, `system` — the last for internal pods that commission autonomously; see `architecture.md §11 Authority Model`), `/pair` approval flow (human roles only; `system` bypasses pairing), revocation with last-admin protection (human roles only — `system` has no last-identity protection), bootstrap from config for human admins and from the `system_identities` block in `deploy/config.json` for `system` identities *(shipped — Slice G)*
+- **Break-glass session minting** — `break_glass.observe` and `break_glass.shell` capabilities, short-lived k3s ServiceAccount tokens, k3s audit log shipped to Clio. *Trigger-attached option (ADR 0003): a second operator, or identity-registry growth beyond the single admin row. Until then, SSH-to-Minos-VM kubectl is the accepted single-operator path.*
 - **Mnemosyne untrusted-source tagging** — run records carry trust markers, context assembly preserves them across runs so injected content does not escalate to "trusted context" between runs
 - **Mnemosyne fact-extraction maturity** — extraction pipeline refinement, per-project retention tuning, index rebuild tooling
 
@@ -132,6 +137,9 @@ Goal: extract the broker fleet, add the pod classes that turn Zakros from "one a
 - Momus reviews every Zakros-opened PR before it reaches the human reviewer, with review comments posted to the PR
 - Themis decomposes a multi-task operator request from Iris into an ordered plan, commissions each task through Minos, and reports progress back through Iris
 - An Argus escalation reaches Themis, is classified (halt / re-plan / escalate-to-human), and the corresponding Minos action fires without operator intervention for the re-plan case
+
+Moved to trigger-attached options with their slices (ADR 0003; each bullet gates that option's completion, not Phase 2):
+
 - Calliope opens a `docs/**` PR after a feature PR merges; Hephaestus opens a draft ADR in `docs/adr/proposed/**` without ever writing to `docs/adr/accepted/**`; Prometheus cuts a release and is blocked on production promotion pending the operator's confirmation token
 
 ---
