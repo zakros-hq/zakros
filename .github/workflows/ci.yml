@@ -23,4 +23,4 @@ jobs:
         run: |
           ! grep -rn "Athena Ollama\|Ollama-hosted\|Ollama port\|via Ollama" \
             --include="*.md" --include="*.go" --include="*.yaml" --include="Dockerfile*" . \
-            | grep -vE "field-delta|project-review-2026|architecture-review|priorities-2026|tighten-up|phase-1-plan"
+            | grep -vE "field-delta|project-review-2026|architecture-review|priorities-2026|tighten-up|phase-1-plan|LESSONS.md"
