@@ -1,8 +1,8 @@
 // Package iris is the long-running conversational pod per
-// architecture.md §10. Slice 0 wires the read-only and commission
-// surface against the Phase 1 Minos HTTP API and a Claude-backed
-// inference path (Athena/Ollama lands when Athena is stood up — see
-// docs/phase-2-plan.md §4 Slice 0 backend deviation).
+// architecture.md §10. Slice 0 wired the read-only and commission
+// surface against the Minos HTTP API with Claude-backed inference;
+// since Slice H2a that traffic routes through Apollo. The Athena-local
+// backend is a config swap (same Anthropic /v1/messages dialect).
 package iris
 
 import (

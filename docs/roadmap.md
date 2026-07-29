@@ -46,7 +46,7 @@ Goal: replace OpenClaw with a system that solves branching isolation and persist
 ### Pods in Labyrinth
 
 - **Daedalus agent pods** — worker backend plugin interface; Phase 1 implementation invokes the `claude-code` binary inside the pod. The binary manages its own Anthropic connection and credentials — Minos injects the operator-configured Claude credential (API key or OAuth token) into the pod's environment at spawn; no Anthropic traffic flows through a Zakros-managed broker. Pod-per-task, one agent per feature branch, isolated workspace per pod.
-- **Iris conversational pod** — long-running pod; single entry point for operator interaction. Translates natural-language requests into Minos commissions and state queries under the admin's identity. Backed by an Ollama-hosted model on Athena (not an external LLM); Iris's inference path is Labyrinth → Athena's Ollama port, same network shape agents already use for local inference.
+- **Iris conversational pod** — long-running pod; single entry point for operator interaction. Translates natural-language requests into Minos commissions and state queries under the admin's identity. Design backend: an Athena-hosted local model via Athena's `/v1/messages` (Anthropic dialect); shipped Claude-backed as the documented Slice 0 interim, routed through Apollo since Slice H2a.
 - **Thread sidecar** — posts status/progress directly to the configured surface via Hermes.
 
 ### Auth posture

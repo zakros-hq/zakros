@@ -417,7 +417,8 @@ Iris is a long-running pod in labyrinth that long-polls Hermes for
 `@iris` / `/iris` messages, asks Claude what to do, and either answers
 state queries (`what's running?`) or commissions tasks. Slice H2a
 routes Anthropic calls through Apollo (Iris no longer holds an
-Anthropic credential); Phase 3 swaps backend to Athena Ollama.
+Anthropic credential); a future Athena-local backend is a
+provider-config swap — Athena serves the same `/v1/messages` dialect.
 
 Apply the Deployment after the worker images are loaded (step 3) and
 Minos is running (step 4). Iris's bearer is now a Minos-minted JWT

@@ -174,11 +174,11 @@ Questions not blocking code work; answers needed before H1/H2/J acceptance check
 
 **Scope:** `phase-1-plan.md §8 Slice E` shape — Iris as a long-running pod on Labyrinth with Minos state API, `@iris` intake, NL-to-commission translation. This is a finish-what-was-started slice, not a Phase 2 structural slice.
 
-**Backend deviation from `architecture.md §10`:** the architecture doc describes Iris's backend as Ollama-hosted on Athena. **Athena is not yet stood up** (it's described in `architecture.md §5` as a pre-existing homelab asset, but the operator has not yet deployed it). For Slice 0, Iris is Claude-backed via the same direct-Anthropic injection pattern Phase 1 `claude-code` pods use — operator's Anthropic credential resolved by Minos, injected into the Iris pod's environment at spawn. The Phase 1 acceptance bullet is functional ("Iris answers...") and doesn't specify backend, so Slice 0 on Claude still closes the gate.
+**Backend deviation from `architecture.md §10`:** the architecture doc described Iris's backend as a local model hosted on Athena, and **Athena was not yet stood up when Slice 0 shipped**. *(Correction 2026-07-29: Athena is now live — a Swift/MLX daemon serving `/v1/messages` in the Anthropic dialect, no Ollama involved — so the flip described below is a provider-config change, not a phase-gated backend swap.)* For Slice 0, Iris is Claude-backed via the same direct-Anthropic injection pattern Phase 1 `claude-code` pods use — operator's Anthropic credential resolved by Minos, injected into the Iris pod's environment at spawn. The Phase 1 acceptance bullet is functional ("Iris answers...") and doesn't specify backend, so Slice 0 on Claude still closes the gate.
 
 Two downstream migrations follow from this interim backend pick — both are small pod-spec config changes, not code work:
 - **When Slice H2 lands (Apollo):** Iris's Anthropic traffic routes through Apollo instead of direct. Iris gains `apollo.anthropic.claude-*` scope on its JWT; credential drops from the pod environment.
-- **When Athena is stood up (Phase 3 per current roadmap):** Iris flips from Claude to local Ollama per the original architecture commitment. Pod spec swaps the `anthropic_endpoint` for the Athena Ollama URL.
+- **When the local backend is adopted:** Iris flips from Claude to Athena-local inference per the original architecture commitment — a provider-config change (Athena serves the same `/v1/messages` dialect), decided alongside H2b's Apollo provider work.
 
 ### Tasks
 
@@ -610,7 +610,7 @@ The H2b work depends on the rate-limit schema + Argus push integration that Slic
 
 1. **Themis pod image.**
    - New `agents/themis/` pod image, long-lived with `zakros.project/pod-class: themis` label
-   - Backend: local inference via Ollama on Athena (qwen3.5:27b per `architecture.md §11 Backend`)
+   - Backend: local inference on Athena via `/v1/messages` (model per Athena's catalog; `architecture.md §11 Backend`)
    - One Themis pod per project (Phase 2 is single-project; multi-project lands in Phase 3)
 
 2. **Themis `system` identity.**

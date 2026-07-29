@@ -37,7 +37,9 @@ All five share the same gap shape: single Proxmox API token in env, no MCP-layer
 
 Candidates: `rawveg/ollama-mcp` (restrictive custom license — **blocker**, prohibits incorporation into third-party services), `emgeee/mcp-ollama` (too narrow), `qdrant/mcp-server-qdrant` (Apache-2, covers only corpus ops), `patruff/ollama-mcp-bridge` (wrong direction — MCP client not server).
 
-**Recommendation: write in-house.** Scope surface spans Ollama + Qdrant + whisper + sandbox lifecycle; no single server covers it, and the Ollama candidate with best coverage is license-hostile. Keep `qdrant/mcp-server-qdrant` as an optional under-the-hood reference for corpus operations.
+**Recommendation: write in-house.** Scope surface spans inference + corpus + transcription + sandbox lifecycle; no single server covers it, and the Ollama candidate with best coverage is license-hostile. Keep `qdrant/mcp-server-qdrant` as an optional under-the-hood reference for corpus operations.
+
+*(Correction 2026-07-29: this evaluation predates Athena as built. Athena shipped as a native Swift/MLX daemon with its own bearer-token RBAC and Anthropic-dialect `/v1/messages` — the Ollama-fronting candidates above are moot; the MCP question is now "front Athena's existing API", re-evaluated when the Athena MCP work starts.)*
 
 ### apollo
 

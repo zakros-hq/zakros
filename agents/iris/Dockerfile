@@ -1,8 +1,8 @@
 # Iris conversational pod. Long-running Go binary that long-polls
 # Hermes, calls Claude, and forwards commissions to Minos.
 #
-# Phase 1 / Slice 0: Claude-backed inference (no Athena Ollama yet).
-# Phase 3 swaps backend at the env-var level — image stays the same.
+# Claude-backed inference via Apollo (Slice H2a). A future flip to
+# Athena-local inference is an env-var change — image stays the same.
 
 FROM golang:1.25-bookworm AS build
 WORKDIR /src

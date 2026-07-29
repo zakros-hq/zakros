@@ -1,8 +1,8 @@
 # Iris conversational pod — long-running, single replica.
 # Applied by deploy/iris-install.sh against the labyrinth k3s cluster.
 # Phase 2 Slice H2a: Iris routes every Anthropic call through Apollo
-# (no direct Anthropic credential in this pod). Phase 3 flips backend
-# to Athena Ollama.
+# (no direct Anthropic credential in this pod). A future Athena-local
+# backend is a provider-config swap (same /v1/messages dialect).
 apiVersion: v1
 kind: Namespace
 metadata:

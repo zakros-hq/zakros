@@ -2,6 +2,8 @@
 
 *Version 0.1 — Draft*
 
+> **Historical record.** Phase 1 shipped; this document is preserved as the plan that built it, not as a description of the current system. Known drift: Slice E's Ollama-backed Iris never happened (Iris shipped Claude-backed as Phase 2 Slice 0; Athena as built is a Swift/MLX daemon serving the Anthropic `/v1/messages` dialect — no Ollama). Current state lives in `README.md` and `docs/phase-2-plan.md`.
+
 ---
 
 ## Purpose

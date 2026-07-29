@@ -3,10 +3,10 @@
 // what to do, and either answers state queries or commissions tasks
 // through Minos's HTTP API.
 //
-// Phase 1 / Slice 0 posture per docs/phase-2-plan.md §4: bearer-token
-// auth (no JWT yet), direct Anthropic Messages API (no Apollo yet),
-// Claude-backed inference (no Athena Ollama yet — Iris flips to local
-// inference once Athena is stood up).
+// Slice H2a posture: JWT auth (Slice F), Anthropic Messages dialect
+// via Apollo (ZAKROS_APOLLO_URL), Claude-backed inference. Flipping to
+// Athena-local inference is a provider-config change — Athena serves
+// the same /v1/messages dialect (docs/phase-2-plan.md slice status).
 package main
 
 import (

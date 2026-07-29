@@ -37,7 +37,7 @@ Specific hardware: Apple Mac Studio (part number Z1CD9LL/A), M4 Max SoC, 40-core
 **Planned expansion:** Athena is expected to grow into a Mac Studio cluster built on M5 Ultra hardware, interconnected over Thunderbolt 5 with RDMA (requires macOS 26.2 or later). The cluster will scale inference capacity and model residency but does not change Athena's architectural contract — it remains a passive oracle reachable on the documented service ports.
 
 What Zakros depends on:
-- An inference node reachable on specific ports (Ollama 11434, embedding 8400, Qdrant 6333, whisper on-demand).
+- An inference node reachable on its API port (Athena daemon on 7447: `/v1/messages` Anthropic dialect, chat completions, embeddings, transcription; bearer-token RBAC).
 - The node does not host agents, workspaces, case data, or source code.
 - The node does not initiate connections to Crete-hosted resources except for one-way log shipping to Clio (the documented carveout; outbound to external model registries is also permitted).
 

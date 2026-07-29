@@ -16,3 +16,11 @@ jobs:
       - run: go vet ./...
       - run: go build ./...
       - run: go test ./...
+      # Docs lint: the "Athena Ollama" system never existed (see
+      # docs/decisions/ + field-delta-2026-07-28.md §4). Historical
+      # review docs and the banner-marked phase-1-plan are exempt.
+      - name: docs-lint (banned fiction phrases)
+        run: |
+          ! grep -rn "Athena Ollama\|Ollama-hosted\|Ollama port\|via Ollama" \
+            --include="*.md" --include="*.go" --include="*.yaml" --include="Dockerfile*" . \
+            | grep -vE "field-delta|project-review-2026|architecture-review|priorities-2026|tighten-up|phase-1-plan"

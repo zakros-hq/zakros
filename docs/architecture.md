@@ -118,12 +118,13 @@ Athena is a passive oracle. It answers inference queries from agents and from Mi
 
 ### Services
 
-| Service | Port | Purpose |
+Athena is a **native Swift/MLX daemon** serving every inference surface on one port. (Earlier drafts described an Ollama/Qdrant service stack; that system was never built — corrected 2026-07-29 against the live daemon's `/openapi.json`.)
+
+| Surface | Port | Purpose |
 |---|---|---|
-| Ollama | 11434 | LLM inference |
-| mlx-whisper | — | Audio transcription (launchd, on-demand) |
-| Embedding server | 8400 | Shared embeddings for all consumers |
-| Qdrant | 6333 | Domain knowledge corpus (legal, infrastructure) |
+| Inference (`/v1/*`) | 7447 | LLM inference — `/v1/messages` (**Anthropic dialect**, the path Zakros clients use) and `/v1/chat/completions`; `/v1/embeddings`; `/v1/audio/transcriptions`; `/v1/models` |
+| Control plane (`/api/*`) | 7447 | Bearer-token RBAC (tokens, roles, users, per-token surfaces), usage + **per-principal server-side budgets** (Athena ADR 041: rolling windows, 429 on breach), self-describing `/openapi.json` |
+| Domain knowledge corpus | — | Design intent for the Phase 3 research path; Athena-side implementation TBD |
 
 ### Configuration
 
@@ -135,14 +136,14 @@ Minos holds the allowlist of which agent types may query which Athena services. 
 
 ### Model Management
 
-Athena's inference services and the Qdrant corpus need periodic updates — new Ollama models, refreshed whisper weights, re-indexed corpus snapshots. These updates require outbound connections to external registries and sources. Athena is permitted to initiate outbound connections to external services; the "does not initiate connections to Crete-hosted resources" constraint applies only to Crete-facing calls.
+Athena's inference services and the knowledge corpus need periodic updates — new models, refreshed transcription weights, re-indexed corpus snapshots. These updates require outbound connections to external registries and sources. Athena is permitted to initiate outbound connections to external services; the "does not initiate connections to Crete-hosted resources" constraint applies only to Crete-facing calls.
 
 All Athena write operations are explicit and operator-triggered through the Athena MCP broker that Minos exposes. Automatic reloads are out of scope for Phase 1.
 
 | Operation | Purpose |
 |---|---|
 | `models.list` | Query loaded and available models |
-| `models.pull` | Pull a model from an external registry (Ollama) |
+| `models.pull` | Pull a model from an external registry |
 | `models.load` / `models.unload` | Manage model residency in unified memory |
 | `corpus.refresh` | Re-import a Qdrant collection from an external source |
 
@@ -187,10 +188,10 @@ For each `sandbox.create`:
 
 **Isolation properties** (delivered by the execution model):
 
-- Unix filesystem permissions — the sandbox user can only read its own workdir; no read access to the Ollama model cache, Qdrant collections, service configs, MCP state, or other sandboxes
+- Unix filesystem permissions — the sandbox user can only read its own workdir; no read access to the model cache, corpus collections, service configs, MCP state, or other sandboxes
 - No write access to any production service path
 - Proxmox firewall permits Labyrinth → Athena sandbox-range traffic; k3s NetworkPolicy (Phase 3 — the phase sandboxes themselves land in) scopes the per-pod source so only the pod that created the sandbox may use it
-- Outbound to production inference services is read-only by default — opt-in per sandbox, audit-logged; never write to the Qdrant corpus under any configuration
+- Outbound to production inference services is read-only by default — opt-in per sandbox, audit-logged; never write to the knowledge corpus under any configuration
 - Workdir-local `TMPDIR` prevents `/tmp/` collisions between sandboxes
 - `killall -u <sandbox-user>` on teardown catches any detached processes that escape the launchd-supervised tree
 
@@ -209,7 +210,7 @@ For each `sandbox.create`:
 
 Athena ships its service logs to Clio via Vector, mirroring the log-shipping pattern used by every other Zakros component. This is the single permitted exception to the no-initiate-to-Crete-resources rule:
 
-- **Shipped:** Ollama, embedding server, Qdrant, whisper, Athena MCP, and Development Sandbox process logs
+- **Shipped:** the Athena daemon (inference, embeddings, transcription), Athena MCP, and Development Sandbox process logs
 - **Purpose:** let operators correlate agent flows end-to-end in one place (Clio) — an inference query from a pod can be traced through the agent's conversation log, the MCP call, and the inference-side execution
 - **Shape:** one-way, fire-and-forget, append-only log stream; not a control channel
 - **Constraint:** Athena cannot use this connection to pull state, receive commands, or trigger actions. The log-shipping exception exists solely to populate Clio's forensic index
@@ -323,7 +324,7 @@ Ingress-plugin selection is a deployment choice, not a per-request choice — on
 
 ### LLM Broker: Apollo
 
-**Phase:** Apollo is **Phase 2**. Phase 1 has no external-LLM broker because no pod calls an external LLM API through Zakros-managed plumbing — the `claude-code` binary in Daedalus pods manages its own Anthropic connection, and Iris uses Athena-local inference via Ollama. Apollo lands when a second provider or centralized usage tracking becomes useful.
+**Phase:** Apollo is **Phase 2**. Phase 1 has no external-LLM broker because no pod calls an external LLM API through Zakros-managed plumbing — the `claude-code` binary in Daedalus pods manages its own Anthropic connection, and Iris shipped Claude-backed as a documented Slice 0 interim (the Athena-local backend remains the design intent). Apollo lands when a second provider or centralized usage tracking becomes useful. *(Since Slice H2a, both Iris and worker pods route Anthropic traffic through Apollo.)*
 
 Every external LLM API call from a Daedalus agent flows through **Apollo**, an MCP broker running alongside Minos on the Minos VM. Apollo fronts providers like Anthropic, OpenAI, Google, xAI, etc., via per-provider plugins. Local inference still goes to Athena directly; Apollo specifically handles external-API inference so those calls are tracked, rate-limited, and paid for under one observed surface.
 
@@ -708,7 +709,7 @@ Argus is the behavioral monitor. Where Minos manages lifecycle, Argus monitors b
 | Decision | Source | Authenticity |
 |---|---|---|
 | Liveness | k3s API (pod phase, restarts, probes) | Authoritative |
-| Budget (tokens, wall-clock) | Phase 2+: Apollo push events for external LLM calls (non-forgeable, from provider responses); plugin runtime reports for local Athena calls; wall-clock from Argus timer. **Phase 1: plugin-reported usage only for external LLM calls** (no Apollo, `claude-code` self-reports) — wall-clock remains authoritative. | Authoritative for external LLM usage **only from Phase 2**; Phase 1 token counts are forgeable by a compromised pod. See "Phase 1 budget posture" below. |
+| Budget (tokens, wall-clock) | Phase 2+: Apollo push events for external LLM calls (non-forgeable, from provider responses); for local Athena calls, **Athena itself enforces per-principal budgets server-side** (Athena ADR 041: rolling-window accounting, 429 on breach, surfaced on `/api/usage`) — Zakros integrates with that enforcement (read usage, honour the 429) rather than metering the path; wall-clock from Argus timer. **Phase 1: plugin-reported usage only for external LLM calls** (no Apollo, `claude-code` self-reports) — wall-clock remains authoritative. | Authoritative for external LLM usage **only from Phase 2**; local-Athena usage is authoritative at Athena (a compromised pod cannot forge past a limit it does not control). Phase 1 external token counts are forgeable by a compromised pod. See "Phase 1 budget posture" below. |
 | Hard guardrail breach | MCP broker audit events (push from every broker to Argus ingest) | Broker-side; not forgeable by agent |
 | Stall | Argus-sidecar container heartbeat and MCP call cadence | Sidecar is a separate container — agent cannot suppress. Phase 1 exception: Iris pods have no Argus sidecar (§10 Pod Configuration), so Iris stall detection falls back to k3s pod phase plus MCP call cadence observed at Hermes and Mnemosyne. |
 | Drift | *Deferred to Phase 2* — Phase 1 is threshold-only | — |
@@ -957,7 +958,7 @@ Minos injects a task-appropriate MCP set in the `capabilities.mcp_endpoints` fie
 | Code / PR work | GitHub (`agent/**` scope), Thread sidecar (→ Hermes) | 1 |
 | Inference tuning | Athena read surface (model status, loaded models), Thread sidecar (→ Hermes) | 1 |
 | Infrastructure change | GitHub, Proxmox API (Crete), Terraform state, Thread sidecar (→ Hermes) | 2 |
-| Research (Pythia) | Athena MCP `inference.query` for summarization (broker-fronted, JWT-scoped — distinct from the direct-Ollama path local-model-backend pods use; see §11–§14), Charon egress (broad outbound); no Thread sidecar — responses flow through the research broker back to the caller | 3 |
+| Research (Pythia) | Athena MCP `inference.query` for summarization (broker-fronted, JWT-scoped — distinct from the direct-Athena path local-model-backend pods use; see §11–§14), Charon egress (broad outbound); no Thread sidecar — responses flow through the research broker back to the caller | 3 |
 | Test (Talos) | GitHub (read), Proxmox API (test-environment provisioning), Thread sidecar (→ Hermes), test-environment target access | 3 |
 | Review (Momus) | GitHub (`pr.read`, `pr.comment`), Apollo (escalation tier), Mnemosyne (`memory.lookup`), Thread sidecar (→ Hermes) | 2 |
 | Docs (Calliope) | GitHub (`repo.read`, `pr.create` scoped to `docs/**`), Mnemosyne (`memory.lookup`), Thread sidecar (→ Hermes) | 2 |
@@ -965,7 +966,7 @@ Minos injects a task-appropriate MCP set in the `capabilities.mcp_endpoints` fie
 | ADR (Hephaestus) | GitHub (`repo.read`, `pr.create` scoped to `docs/adr/proposed/**` and `docs/reports/**`), Mnemosyne (`memory.lookup`), Apollo (Sonnet/Opus), Thread sidecar (→ Hermes) | 2 |
 | PM (Themis) | Minos (`query_state` via pod JWT; commission/cancel travel the identity-capability path under Themis's system identity — see §11 Authority Model), Mnemosyne (`memory.lookup`, `memory.get_context`), Argus escalation ingest, Thread sidecar (via Iris fan-out) | 2 |
 
-This table lists MCP-scoped broker reaches only. Non-MCP network reaches — direct-HTTP calls to Athena's Ollama port by local-model-backend pods, in particular — appear in the per-pod Capabilities tables in §11–§14 (Themis, Momus, Calliope, Prometheus) and in §10's Pod Configuration network-reach row for Iris, plus the §16 egress rows. §15 Hephaestus has no direct-Ollama reach (Claude-tier via Apollo only); §9 Pythia reaches Athena only through the `inference.query` MCP broker path, not via direct Ollama. §16 is the canonical "what reaches what" surface if the two ever disagree.
+This table lists MCP-scoped broker reaches only. Non-MCP network reaches — direct-HTTP calls to Athena's inference API (:7447) by local-model-backend pods, in particular — appear in the per-pod Capabilities tables in §11–§14 (Themis, Momus, Calliope, Prometheus) and in §10's Pod Configuration network-reach row for Iris, plus the §16 egress rows. §15 Hephaestus has no direct-Athena reach (Claude-tier via Apollo only); §9 Pythia reaches Athena only through the `inference.query` MCP broker path, not via the direct inference API. §16 is the canonical "what reaches what" surface if the two ever disagree.
 
 ### Trust Boundary and Untrusted Content
 
@@ -1027,7 +1028,7 @@ The interaction pattern is request/response. A Daedalus agent invokes a research
 | Internet egress | Proxmox firewall allowlist (GitHub, package registries, internal services including Hermes, Athena, Argus, Clio) | Broad outbound HTTPS (via Charon in Phase 2) |
 | GitHub write | Yes (`agent/**` scope) | No |
 | Filesystem persistence | Ephemeral workspace within the pod | Ephemeral scratch; no external write |
-| MCP capabilities | Task-appropriate set (Code/PR, Infra, etc.) | Athena MCP `inference.query` for summarization (broker-fronted, JWT-scoped — distinct from the direct-Ollama path local-model-backend pods use; see §11–§14); local file scratch |
+| MCP capabilities | Task-appropriate set (Code/PR, Infra, etc.) | Athena MCP `inference.query` for summarization (broker-fronted, JWT-scoped — distinct from the direct-Athena path local-model-backend pods use; see §11–§14); local file scratch |
 | Invoked by | Human via Minos intake | Daedalus agent via research MCP broker |
 
 ### Lifecycle
@@ -1078,7 +1079,7 @@ The content block is always bracketed by unambiguous untrusted-content markers. 
 
 ## 10. Iris — Conversational Interface
 
-**Phase:** Iris is **Phase 1**. Phase 1 scope is narrower than the full design here: state queries, commission on behalf of the admin, and direct running agents under admin identity. The Phase 1 Iris pod uses an **Ollama-hosted model on Athena** as its inference backend (not the Anthropic API). Capabilities that depend on Phase 2 features (pairing approval, break-glass issuance) are deferred to the phase their dependency lands in.
+**Phase:** Iris is **Phase 1**. Phase 1 scope is narrower than the full design here: state queries, commission on behalf of the admin, and direct running agents under admin identity. The design backend is an **Athena-hosted local model**; Slice 0 shipped Iris Claude-backed as a documented interim, and since Slice H2a that traffic routes through Apollo. Because Athena serves `/v1/messages` in the same Anthropic dialect Iris speaks, the flip to the local backend is a provider-config change, not a client rewrite. Capabilities that depend on Phase 2 features (pairing approval, break-glass issuance) are deferred to the phase their dependency lands in.
 
 ### Role
 
@@ -1121,10 +1122,10 @@ For user-delegated actions (commission, direct, approve), Iris does *not* use it
 |---|---|
 | Pod class label | `zakros.project/pod-class: iris` |
 | Lifecycle | Long-running (not task-scoped) |
-| Backend | Phase 1: Ollama-hosted model on Athena, reached via the Athena inference port. Other backends (Claude Code, custom) are Phase 2+ alternatives. |
+| Backend | Design: Athena-hosted local model via `/v1/messages` (Anthropic dialect, :7447). Shipped: Claude-backed interim (Slice 0), routed through Apollo since H2a. Other backends (Claude Code, custom) remain alternatives. |
 | Resource tier | `medium` workspace size default (handles conversation context windows) |
 | Sidecars | Thread sidecar (→ Hermes); Argus sidecar is Phase 2 when Argus extracts as a service |
-| Network reach | Hermes (Minos VM), Minos state API (Minos VM), Mnemosyne MCP (Minos VM), Clio query API (Clio VM), Athena Ollama port |
+| Network reach | Hermes (Minos VM), Minos state API (Minos VM), Mnemosyne MCP (Minos VM), Clio query API (Clio VM), Athena inference API (:7447) |
 | Trust boundary | User messages are untrusted content; Iris applies best-effort framing in Phase 1, formal trust-boundary contract in Phase 2 |
 
 ### Conversation State
@@ -1214,7 +1215,7 @@ Themis is load-bearing once the pod fleet is non-trivial. Without it, Iris must 
 | Internet egress | None (internal only) |
 | GitHub write | No (reads issue trackers and PR state only) |
 | Filesystem persistence | Ephemeral scratch; durable state lives in Minos's task registry and Mnemosyne |
-| MCP capabilities | Minos (`query_state` via pod JWT; commission/cancel travel the identity-capability path under Themis's system identity — see Authority Model below), Mnemosyne (`memory.lookup`, `memory.get_context`), Hermes (post-only via Iris fan-out; Themis does not chat directly), Argus escalation ingest, Athena Ollama inference (direct HTTP, not MCP-scoped) for the local-model backend |
+| MCP capabilities | Minos (`query_state` via pod JWT; commission/cancel travel the identity-capability path under Themis's system identity — see Authority Model below), Mnemosyne (`memory.lookup`, `memory.get_context`), Hermes (post-only via Iris fan-out; Themis does not chat directly), Argus escalation ingest, Athena inference API (`/v1/messages`, direct HTTP, not MCP-scoped) for the local-model backend |
 | Invoked by | Iris (on operator request), Argus (on guardrail escalation), scheduled rollup |
 
 ### Lifecycle
@@ -1269,7 +1270,7 @@ Momus is a distinct function from QA (Talos, Phase 3) and from red team (Minotau
 | Internet egress | None |
 | GitHub write | Comment-only on PRs (no approve, no request-changes, no merge). Review verdict posted as a structured comment for human reviewers. |
 | Filesystem persistence | Ephemeral checkout of the PR branch; torn down after review |
-| MCP capabilities | GitHub (`pr.read`, `pr.comment`), Apollo (for escalation-tier review), Thread sidecar (→ Hermes for progress posts), Mnemosyne (`memory.lookup` for prior-review context on the same file/area), Athena Ollama inference (direct HTTP, not MCP-scoped) for the local triage tier |
+| MCP capabilities | GitHub (`pr.read`, `pr.comment`), Apollo (for escalation-tier review), Thread sidecar (→ Hermes for progress posts), Mnemosyne (`memory.lookup` for prior-review context on the same file/area), Athena inference API (`/v1/messages`, direct HTTP, not MCP-scoped) for the local triage tier |
 | Invoked by | Cerberus PR-opened / PR-updated webhook → Minos → Momus commission |
 
 ### Lifecycle
@@ -1321,7 +1322,7 @@ Calliope exists because documentation is consistently neglected in automated dev
 | Internet egress | None |
 | GitHub write | Branch push + PR open on `docs/**` paths only. Path scoping is enforced at the `github` MCP broker (not at the installation token, which GitHub scopes to a repo, not a path); a compromised Calliope cannot bypass path restrictions because the broker refuses non-matching write calls. Never touches application code. |
 | Filesystem persistence | Ephemeral workspace |
-| MCP capabilities | GitHub (`repo.read`, `pr.create` scoped to `docs/**`), Mnemosyne (`memory.lookup` for prior doc decisions and project glossary), Thread sidecar (→ Hermes), Athena Ollama inference (direct HTTP, not MCP-scoped) for the local-model backend |
+| MCP capabilities | GitHub (`repo.read`, `pr.create` scoped to `docs/**`), Mnemosyne (`memory.lookup` for prior doc decisions and project glossary), Thread sidecar (→ Hermes), Athena inference API (`/v1/messages`, direct HTTP, not MCP-scoped) for the local-model backend |
 | Invoked by | Themis on merged-PR events, scheduled rollup for changelog maintenance, direct operator commission for one-off doc work |
 
 ### Lifecycle
@@ -1356,7 +1357,7 @@ Prometheus owns release engineering: pipeline configuration, environment promoti
 | Internet egress | Package registries, container registries, artifact destinations (per project-registry allowlist) |
 | GitHub write | Yes, scoped to CI config paths (`.github/workflows/**`, `ci/**`, `release/**`) and version files (`VERSION`, `package.json` version bumps, etc.). Path scoping is enforced at the `github` MCP broker, not at the installation token. |
 | Filesystem persistence | Ephemeral workspace with registry-cache mount |
-| MCP capabilities | GitHub (`repo.read`, `pr.create` scoped to release paths), Proxmox API (environment provisioning for staging/prod promotion — Phase 2), artifact publisher, Thread sidecar (→ Hermes), Athena Ollama inference (direct HTTP, not MCP-scoped) for the local-model backend |
+| MCP capabilities | GitHub (`repo.read`, `pr.create` scoped to release paths), Proxmox API (environment provisioning for staging/prod promotion — Phase 2), artifact publisher, Thread sidecar (→ Hermes), Athena inference API (`/v1/messages`, direct HTTP, not MCP-scoped) for the local-model backend |
 | Invoked by | Themis on release-eligible events (main-branch merge with semver-bump label, scheduled releases), direct operator commission |
 
 ### Lifecycle
@@ -1483,11 +1484,11 @@ NetworkPolicies are organized by pod class, selected via labels (`zakros.project
 | Pod class | Egress allowed to |
 |---|---|
 | Daedalus | Minos VM (Hermes, Argus ingest, MCP brokers), Clio (log ingest), Athena (inference ports), external via Charon |
-| Iris | Minos VM (state API, Hermes), Clio (query), Athena (Ollama inference) |
-| Themis | Minos VM (task API, Mnemosyne, Argus ingest, Hermes via Iris fan-out), Clio, Athena (Ollama inference) |
-| Momus | Minos VM (GitHub broker, Apollo broker, Mnemosyne, Hermes, Argus ingest), Clio, Athena (Ollama inference for local triage tier); no direct external egress |
-| Calliope | Minos VM (GitHub broker, Mnemosyne, Hermes, Argus ingest), Clio, Athena (Ollama inference); no direct external egress |
-| Prometheus | Minos VM (GitHub broker, Proxmox broker, Hermes, Argus ingest), Clio, Athena (Ollama inference), external artifact destinations via Charon |
+| Iris | Minos VM (state API, Hermes), Clio (query), Athena (inference API) |
+| Themis | Minos VM (task API, Mnemosyne, Argus ingest, Hermes via Iris fan-out), Clio, Athena (inference API) |
+| Momus | Minos VM (GitHub broker, Apollo broker, Mnemosyne, Hermes, Argus ingest), Clio, Athena (inference API for local triage tier); no direct external egress |
+| Calliope | Minos VM (GitHub broker, Mnemosyne, Hermes, Argus ingest), Clio, Athena (inference API); no direct external egress |
+| Prometheus | Minos VM (GitHub broker, Proxmox broker, Hermes, Argus ingest), Clio, Athena (inference API), external artifact destinations via Charon |
 | Hephaestus | Minos VM (GitHub broker, Apollo broker, Mnemosyne, Hermes, Argus ingest), Clio; no direct external egress (Claude-tier inference goes through Apollo) |
 | Pythia | Minos VM (Argus ingest, research-broker response), Clio, Athena (inference only), external via Charon (broad allowlist with denylist + per-task domain narrowing) |
 | Talos | Superset of Daedalus plus test-environment targets (Proxmox MCP for VM provisioning; test-environment IPs) |
@@ -1509,7 +1510,7 @@ No pod class's default egress list includes another pod — all cross-pod coordi
 
 **Phase 1 — IP-range allowlist via Proxmox firewall.**
 
-Daedalus and Iris are the only pod classes in Phase 1. Their allowlist is narrow: GitHub, specific package registries, Athena (Ollama for Iris; inference as granted for Zakros), internal Crete services (Minos state API, Hermes, Clio). Pods do not need surface-API egress — Hermes on the Minos VM intermediates. Proxmox firewall enforces at IP/port granularity, using curated CIDR aliases:
+Daedalus and Iris are the only pod classes in Phase 1. Their allowlist is narrow: GitHub, specific package registries, Athena (inference API as granted), internal Crete services (Minos state API, Hermes, Clio). Pods do not need surface-API egress — Hermes on the Minos VM intermediates. Proxmox firewall enforces at IP/port granularity, using curated CIDR aliases:
 
 - **GitHub IP ranges** fetched from `api.github.com/meta` and refreshed daily by a Minos-scheduled job; materialized as Proxmox firewall aliases (applies to both Labyrinth pods and the Minos VM)
 - **Package registry CIDRs** — published CDN ranges for Fastly (npm, PyPI), CloudFront (crates.io), Google (proxy.golang.org), etc.; refreshed weekly (applies to Labyrinth pods)
@@ -1579,7 +1580,7 @@ Clio is the log collection and archive service. Where Argus decides — consumin
 - k3s system logs (kubelet, CNI, control plane)
 - Minos and Argus own service logs
 - MCP broker call logs — the same events Argus consumes, retained here for audit and cross-reference
-- Athena service logs — Ollama, embedding server, Qdrant, whisper, Athena MCP, Development Sandbox processes — shipped via Vector from Athena (see §5 Observability)
+- Athena service logs — the Athena daemon (inference, embeddings, transcription), Athena MCP, Development Sandbox processes — shipped via Vector from Athena (see §5 Observability)
 
 ### Configuration
 
@@ -1628,7 +1629,7 @@ Asclepius runs in a dedicated Proxmox LXC on Crete, independent of Minos VM. Thi
 
 **Athena node:**
 
-- Ollama responsive; models loaded as expected
+- Athena daemon responsive; models loaded as expected
 - Embedding server responsive
 - Qdrant reachable
 - mlx-whisper daemon available (on-demand launch tested)
